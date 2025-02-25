@@ -30,6 +30,8 @@
 source ~/neuromorphic/turtwig/scripts/hopper/neuromodules.sh
 cd turtwig
 
+export MAKE_PARENTS=true
+
 ## Run your program or script
 python experiment_tenn2.py train --root out/mill/9 -p 48 --save_best --epochs 100 --eons_seed 20 -N 9
 python experiment_tenn2.py train --root out/mill/9 -p 48 --save_best --epochs 100 --eons_seed 21 -N 9
