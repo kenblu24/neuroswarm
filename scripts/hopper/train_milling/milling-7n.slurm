@@ -21,7 +21,7 @@
 #SBATCH --mem=4G        # Total memory needed per task (units: K,M,G,T)
 
 ## Specify how much time your job needs. (default: see partition above)
-#SBATCH --time=0-12:00  # Total time needed for job: Days-Hours:Minutes
+#SBATCH --time=0-09:00  # Total time needed for job: Days-Hours:Minutes
 
 #SBATCH --cpus-per-task 48
 
@@ -33,8 +33,8 @@ cd turtwig
 export MAKE_PARENTS=true
 
 ## Run your program or script
-python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 100 --eons_seed 20 -N 7
-python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 100 --eons_seed 21 -N 7
-python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 100 --eons_seed 22 -N 7
-python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 100 --eons_seed 23 -N 7
-python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 100 --eons_seed 24 -N 7
+python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 500 --eons_seed 20 -N 7
+python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 500 --eons_seed 21 -N 7
+python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 500 --eons_seed 22 -N 7
+python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 500 --eons_seed 23 -N 7
+python experiment_tenn2.py train --root out/mill/7 -p 48 --save_best --epochs 500 --eons_seed 24 -N 7
