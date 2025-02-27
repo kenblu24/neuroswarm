@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Give your job a name to distinguish it from other jobs you run.
-#SBATCH --job-name=tenn2-mill-10n
+#SBATCH --job-name=tenn2-agg-3n
 
 ## General partitions: all-HiPri, bigmem-HiPri   --   (12 hour limit)
 ##                     all-LoPri, bigmem-LoPri, gpuq  (5 days limit)
@@ -33,8 +33,8 @@ cd turtwig
 export MAKE_PARENTS=true
 
 ## Run your program or script
-python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 20 -N 10
-python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 21 -N 10
-python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 22 -N 10
-python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 23 -N 10
-python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 24 -N 10
+python experiment_tenn2.py train --root out/agg/3 -p 48 --save_best --epochs 500 --eons_seed 20 -N 3
+python experiment_tenn2.py train --root out/agg/3 -p 48 --save_best --epochs 500 --eons_seed 21 -N 3
+python experiment_tenn2.py train --root out/agg/3 -p 48 --save_best --epochs 500 --eons_seed 22 -N 3
+python experiment_tenn2.py train --root out/agg/3 -p 48 --save_best --epochs 500 --eons_seed 23 -N 3
+python experiment_tenn2.py train --root out/agg/3 -p 48 --save_best --epochs 500 --eons_seed 24 -N 3
