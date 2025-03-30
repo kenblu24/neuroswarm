@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Give your job a name to distinguish it from other jobs you run.
-#SBATCH --job-name=tenn2-agg-seed_seedint
+#SBATCH --job-name=tenn2-agg-seed_33
 
 ## General partitions: all-HiPri, bigmem-HiPri   --   (12 hour limit)
 ##                     all-LoPri, bigmem-LoPri, gpuq  (5 days limit)
@@ -33,14 +33,14 @@ cd turtwig
 export MAKE_PARENTS=true
 
 ## Run your program or script
-python experiment_tenn2.py train --root out/agg/3  -p 48 --save_best --epochs 500 --eons_seed seedint -N 3
-python experiment_tenn2.py train --root out/agg/4  -p 48 --save_best --epochs 500 --eons_seed seedint -N 4
-python experiment_tenn2.py train --root out/agg/5  -p 48 --save_best --epochs 500 --eons_seed seedint -N 5
-python experiment_tenn2.py train --root out/agg/6  -p 48 --save_best --epochs 500 --eons_seed seedint -N 6
-python experiment_tenn2.py train --root out/agg/7  -p 48 --save_best --epochs 500 --eons_seed seedint -N 7
-python experiment_tenn2.py train --root out/agg/7  -p 48 --save_best --epochs 500 --eons_seed seedint -N 7
-python experiment_tenn2.py train --root out/agg/8  -p 48 --save_best --epochs 500 --eons_seed seedint -N 8
-python experiment_tenn2.py train --root out/agg/8  -p 48 --save_best --epochs 500 --eons_seed seedint -N 8
-python experiment_tenn2.py train --root out/agg/9  -p 48 --save_best --epochs 500 --eons_seed seedint -N 9
-python experiment_tenn2.py train --root out/agg/9  -p 48 --save_best --epochs 500 --eons_seed seedint -N 9
-python experiment_tenn2.py train --root out/agg/10 -p 48 --save_best --epochs 500 --eons_seed seedint -N 10
+python experiment_tenn2.py train --root out/agg/3  -p 48 --save_best --epochs 500 --eons_seed 33 -N 3
+python experiment_tenn2.py train --root out/agg/4  -p 48 --save_best --epochs 500 --eons_seed 33 -N 4
+python experiment_tenn2.py train --root out/agg/5  -p 48 --save_best --epochs 500 --eons_seed 33 -N 5
+python experiment_tenn2.py train --root out/agg/6  -p 48 --save_best --epochs 500 --eons_seed 33 -N 6
+python experiment_tenn2.py train --root out/agg/7  -p 48 --save_best --epochs 500 --eons_seed 33 -N 7
+python experiment_tenn2.py train --root out/agg/7  -p 48 --save_best --epochs 500 --eons_seed 33 -N 7
+python experiment_tenn2.py train --root out/agg/8  -p 48 --save_best --epochs 500 --eons_seed 33 -N 8
+python experiment_tenn2.py train --root out/agg/8  -p 48 --save_best --epochs 500 --eons_seed 33 -N 8
+python experiment_tenn2.py train --root out/agg/9  -p 48 --save_best --epochs 500 --eons_seed 33 -N 9
+python experiment_tenn2.py train --root out/agg/9  -p 48 --save_best --epochs 500 --eons_seed 33 -N 9
+python experiment_tenn2.py train --root out/agg/10 -p 48 --save_best --epochs 500 --eons_seed 33 -N 10
