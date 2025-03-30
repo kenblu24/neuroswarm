@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Give your job a name to distinguish it from other jobs you run.
-#SBATCH --job-name=tenn2-mill-seed_32
+#SBATCH --job-name=tenn2-mill-es32
 
 ## General partitions: all-HiPri, bigmem-HiPri   --   (12 hour limit)
 ##                     all-LoPri, bigmem-LoPri, gpuq  (5 days limit)
@@ -21,7 +21,7 @@
 #SBATCH --mem=4G        # Total memory needed per task (units: K,M,G,T)
 
 ## Specify how much time your job needs. (default: see partition above)
-#SBATCH --time=0-10:00  # Total time needed for job: Days-Hours:Minutes
+#SBATCH --time=0-14:00  # Total time needed for job: Days-Hours:Minutes
 
 #SBATCH --cpus-per-task 48
 
@@ -33,14 +33,14 @@ cd turtwig
 export MAKE_PARENTS=true
 
 ## Run your program or script
-python experiment_tenn2.py train --root out/mill/3  -p 48 --save_best --epochs 500 --eons_seed 32 -N 3
-python experiment_tenn2.py train --root out/mill/4  -p 48 --save_best --epochs 500 --eons_seed 32 -N 4
-python experiment_tenn2.py train --root out/mill/5  -p 48 --save_best --epochs 500 --eons_seed 32 -N 5
-python experiment_tenn2.py train --root out/mill/6  -p 48 --save_best --epochs 500 --eons_seed 32 -N 6
-python experiment_tenn2.py train --root out/mill/7  -p 48 --save_best --epochs 500 --eons_seed 32 -N 7
-python experiment_tenn2.py train --root out/mill/7  -p 48 --save_best --epochs 500 --eons_seed 32 -N 7
-python experiment_tenn2.py train --root out/mill/8  -p 48 --save_best --epochs 500 --eons_seed 32 -N 8
-python experiment_tenn2.py train --root out/mill/8  -p 48 --save_best --epochs 500 --eons_seed 32 -N 8
-python experiment_tenn2.py train --root out/mill/9  -p 48 --save_best --epochs 500 --eons_seed 32 -N 9
-python experiment_tenn2.py train --root out/mill/9  -p 48 --save_best --epochs 500 --eons_seed 32 -N 9
-python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 32 -N 10
+python experiment_tenn2.py train --root out/mill/3  -p 48 --save_best --epochs 500 --eons_seed 32 -N 3  --pname_suffix rss_snn_eons_mill-es32_n3
+python experiment_tenn2.py train --root out/mill/4  -p 48 --save_best --epochs 500 --eons_seed 32 -N 4  --pname_suffix rss_snn_eons_mill-es32_n4
+python experiment_tenn2.py train --root out/mill/5  -p 48 --save_best --epochs 500 --eons_seed 32 -N 5  --pname_suffix rss_snn_eons_mill-es32_n5
+python experiment_tenn2.py train --root out/mill/6  -p 48 --save_best --epochs 500 --eons_seed 32 -N 6  --pname_suffix rss_snn_eons_mill-es32_n6
+python experiment_tenn2.py train --root out/mill/7  -p 48 --save_best --epochs 500 --eons_seed 32 -N 7  --pname_suffix rss_snn_eons_mill-es32_n7
+python experiment_tenn2.py train --root out/mill/7  -p 48 --save_best --epochs 500 --eons_seed 32 -N 7  --pname_suffix rss_snn_eons_mill-es32_n7
+python experiment_tenn2.py train --root out/mill/8  -p 48 --save_best --epochs 500 --eons_seed 32 -N 8  --pname_suffix rss_snn_eons_mill-es32_n8
+python experiment_tenn2.py train --root out/mill/8  -p 48 --save_best --epochs 500 --eons_seed 32 -N 8  --pname_suffix rss_snn_eons_mill-es32_n8
+python experiment_tenn2.py train --root out/mill/9  -p 48 --save_best --epochs 500 --eons_seed 32 -N 9  --pname_suffix rss_snn_eons_mill-es32_n9
+python experiment_tenn2.py train --root out/mill/9  -p 48 --save_best --epochs 500 --eons_seed 32 -N 9  --pname_suffix rss_snn_eons_mill-es32_n9
+python experiment_tenn2.py train --root out/mill/10 -p 48 --save_best --epochs 500 --eons_seed 32 -N 10 --pname_suffix rss_snn_eons_mill-es32_n10
