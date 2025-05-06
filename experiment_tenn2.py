@@ -73,9 +73,9 @@ class ConnorMillingExperiment(TennExperiment):
             config.spawners[0]['n'] = self.agents
 
         config.metrics = [
-            metrics.Aggregation(history=max(self.cycles, 1)),
+            metrics.Dispersal(history=450),
+            metrics.Aggregation(history=450),
             metrics.Circliness(history=max(self.cycles, 1), avg_history_max=450),
-            # metrics.DistanceSizeRatio(history=max(self.cycles, 1)),
         ]
 
         def callback(world, screen):
