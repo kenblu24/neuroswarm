@@ -38,9 +38,6 @@ python experiment_tenn2.py train --root out/diff/4  -p 48 --save_best --epochs 5
 python experiment_tenn2.py train --root out/diff/5  -p 48 --save_best --epochs 500 --eons_seed 28 -N 5  --pname_suffix rss_snn_eons_diff-es28_n5
 python experiment_tenn2.py train --root out/diff/6  -p 48 --save_best --epochs 500 --eons_seed 28 -N 6  --pname_suffix rss_snn_eons_diff-es28_n6
 python experiment_tenn2.py train --root out/diff/7  -p 48 --save_best --epochs 500 --eons_seed 28 -N 7  --pname_suffix rss_snn_eons_diff-es28_n7
-python experiment_tenn2.py train --root out/diff/7  -p 48 --save_best --epochs 500 --eons_seed 28 -N 7  --pname_suffix rss_snn_eons_diff-es28_n7
 python experiment_tenn2.py train --root out/diff/8  -p 48 --save_best --epochs 500 --eons_seed 28 -N 8  --pname_suffix rss_snn_eons_diff-es28_n8
-python experiment_tenn2.py train --root out/diff/8  -p 48 --save_best --epochs 500 --eons_seed 28 -N 8  --pname_suffix rss_snn_eons_diff-es28_n8
-python experiment_tenn2.py train --root out/diff/9  -p 48 --save_best --epochs 500 --eons_seed 28 -N 9  --pname_suffix rss_snn_eons_diff-es28_n9
 python experiment_tenn2.py train --root out/diff/9  -p 48 --save_best --epochs 500 --eons_seed 28 -N 9  --pname_suffix rss_snn_eons_diff-es28_n9
 python experiment_tenn2.py train --root out/diff/10 -p 48 --save_best --epochs 500 --eons_seed 28 -N 10 --pname_suffix rss_snn_eons_diff-es28_n10
