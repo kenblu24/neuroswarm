@@ -38,9 +38,6 @@ python experiment_tenn2.py train --root out/agg/4  -p 48 --save_best --epochs 50
 python experiment_tenn2.py train --root out/agg/5  -p 48 --save_best --epochs 500 --eons_seed 32 -N 5  --pname_suffix rss_snn_eons_agg-es32_n5
 python experiment_tenn2.py train --root out/agg/6  -p 48 --save_best --epochs 500 --eons_seed 32 -N 6  --pname_suffix rss_snn_eons_agg-es32_n6
 python experiment_tenn2.py train --root out/agg/7  -p 48 --save_best --epochs 500 --eons_seed 32 -N 7  --pname_suffix rss_snn_eons_agg-es32_n7
-python experiment_tenn2.py train --root out/agg/7  -p 48 --save_best --epochs 500 --eons_seed 32 -N 7  --pname_suffix rss_snn_eons_agg-es32_n7
 python experiment_tenn2.py train --root out/agg/8  -p 48 --save_best --epochs 500 --eons_seed 32 -N 8  --pname_suffix rss_snn_eons_agg-es32_n8
-python experiment_tenn2.py train --root out/agg/8  -p 48 --save_best --epochs 500 --eons_seed 32 -N 8  --pname_suffix rss_snn_eons_agg-es32_n8
-python experiment_tenn2.py train --root out/agg/9  -p 48 --save_best --epochs 500 --eons_seed 32 -N 9  --pname_suffix rss_snn_eons_agg-es32_n9
 python experiment_tenn2.py train --root out/agg/9  -p 48 --save_best --epochs 500 --eons_seed 32 -N 9  --pname_suffix rss_snn_eons_agg-es32_n9
 python experiment_tenn2.py train --root out/agg/10 -p 48 --save_best --epochs 500 --eons_seed 32 -N 10 --pname_suffix rss_snn_eons_agg-es32_n10
