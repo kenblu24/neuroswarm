@@ -38,9 +38,6 @@ python experiment_tenn2.py train --root out/dis/4  -p 48 --save_best --epochs 50
 python experiment_tenn2.py train --root out/dis/5  -p 48 --save_best --epochs 500 --eons_seed 33 -N 5  --pname_suffix rss_snn_eons_dis-es33_n5
 python experiment_tenn2.py train --root out/dis/6  -p 48 --save_best --epochs 500 --eons_seed 33 -N 6  --pname_suffix rss_snn_eons_dis-es33_n6
 python experiment_tenn2.py train --root out/dis/7  -p 48 --save_best --epochs 500 --eons_seed 33 -N 7  --pname_suffix rss_snn_eons_dis-es33_n7
-python experiment_tenn2.py train --root out/dis/7  -p 48 --save_best --epochs 500 --eons_seed 33 -N 7  --pname_suffix rss_snn_eons_dis-es33_n7
 python experiment_tenn2.py train --root out/dis/8  -p 48 --save_best --epochs 500 --eons_seed 33 -N 8  --pname_suffix rss_snn_eons_dis-es33_n8
-python experiment_tenn2.py train --root out/dis/8  -p 48 --save_best --epochs 500 --eons_seed 33 -N 8  --pname_suffix rss_snn_eons_dis-es33_n8
-python experiment_tenn2.py train --root out/dis/9  -p 48 --save_best --epochs 500 --eons_seed 33 -N 9  --pname_suffix rss_snn_eons_dis-es33_n9
 python experiment_tenn2.py train --root out/dis/9  -p 48 --save_best --epochs 500 --eons_seed 33 -N 9  --pname_suffix rss_snn_eons_dis-es33_n9
 python experiment_tenn2.py train --root out/dis/10 -p 48 --save_best --epochs 500 --eons_seed 33 -N 10 --pname_suffix rss_snn_eons_dis-es33_n10
