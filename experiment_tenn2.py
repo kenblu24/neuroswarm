@@ -65,8 +65,10 @@ class ConnorMillingExperiment(TennExperiment):
         if self.use_caspian:
             from rss.CaspianBinaryController import CaspianBinaryController
             from rss.CaspianBinaryRemappedController import CaspianBinaryRemappedController
+            from rss.CaspianTriggeredVoronoiController import CaspianTriggeredVoronoiController
             register_dictlike_type('controller', "CaspianBinaryController", CaspianBinaryController)
             register_dictlike_type('controller', "CaspianBinaryRemappedController", CaspianBinaryRemappedController)
+            register_dictlike_type('controller', "CaspianTriggeredVoronoiController", CaspianTriggeredVoronoiController)
         else:
             from rss.CasPyanBinaryController import CasPyanBinaryController
             from rss.CasPyanBinaryRemappedController import CasPyanBinaryRemappedController
@@ -85,6 +87,7 @@ class ConnorMillingExperiment(TennExperiment):
             config.spawners[0]['n'] = self.agents
 
         config.metrics = [
+            metrics.VoronoiRelaxation(history=max(self.cycles, 1)),
             metrics.Circliness(history=max(self.cycles, 1), avg_history_max=450),
             # metrics.Aggregation(history=max(self.cycles, 1)),
             # metrics.DistanceSizeRatio(history=max(self.cycles, 1)),

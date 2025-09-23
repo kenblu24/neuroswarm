@@ -1,0 +1,33 @@
+# Units are MGS (Meters, Grams, Seconds) and radians unless otherwise specified
+type: "MazeAgent"
+sensors:
+  - type: "RelativeAgentSensor"
+    distance: 2.0  # meters
+    show: true
+    bias: 0
+    store_history: false
+controller:
+  type: "CaspianTriggeredVoronoiController"
+  neuro_tpc: 20
+  scale_forward_speed: 0.2  # m/s forward speed factor
+  scale_turning_rates: 2.0  # rad/s turning rate factor
+  sensor_id: 0
+agent_radius: !np 0.2 / 2
+stop_at_goal: false
+# delay: 12
+# idiosyncrasies:
+#   mean:
+#     - 0.9
+#     - 0.9
+#     - 0.95
+#   sd:
+#     - 0.1
+#     - 0.1
+#     - 0.06
+scale_forward_speed: 0.2  # m/s
+scale_turning_rates: 2.0  # rad/s
+body_color:
+  - 255
+  - 0
+  - 0
+body_filled: true
