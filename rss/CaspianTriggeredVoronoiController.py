@@ -1,3 +1,10 @@
+"""
+SNN controller that triggers when agent should update its waypoint
+
+Use with sensor_id pointing to a RelativeAgentSensor on the agent
+And the world should have a VoronoiRelaxation metric in world.metrics
+"""
+
 import math
 import numpy as np
 
@@ -88,11 +95,12 @@ class CaspianTriggeredVoronoiController(CaspianBinaryController):
     def run_processor(self, observation, scale_input: float = 1.0):
         positions = observation
         positions = np.asarray(sorted(list(positions), key=np.linalg.norm))
-        flat = np.zeros(self.n_inputs)
-        data = positions[:(self.n_inputs - 1)] * scale_input
-        data = data.flatten()
-        flat[:len(data)] = data
-        flat[-1] = 1.
+        flat = np.zeros(self.n_inputs)  # eventual input vector
+        # flatten the positions. If there are too many to fit our input vector, just use the first n_inputs-1 positions
+        data = positions.flatten()[:(self.n_inputs - 1)]
+        data *= scale_input  # normalize the inputs so it fits encoder range
+        flat[:len(data)] = data  # copy the normalized inputs into the input vector
+        flat[-1] = 1.  # add a constant input to the last input for spikes on every processor tick
         spikes = self.encoder.get_spikes(flat)
         self.processor.apply_spikes(spikes)
         self.processor.run(self.extra_ticks)
@@ -117,36 +125,44 @@ class CaspianTriggeredVoronoiController(CaspianBinaryController):
                 return metric
         raise RuntimeError("Could not find VoronoiRelaxation metric in world.")
 
-    def find_nearest_centroid(self, vor_metric: VoronoiRelaxation, agent):
+    def target_centroid(self, vor_metric: VoronoiRelaxation, agent):
+        """Get the centroid corresponding to this agent"""
+        # This is currently calculated by finding the closest centroid to the agent
+        # This is not necessarily the centroid of the agent's current voronoi cell
+        # THIS IS WHAT IS BROKEN
+        # TODO: Actually get the centroid of the agent's current voronoi cell
         if not vor_metric.vor:
-            return None
+            return None  # If voronoi tesselation hasn't been calculated yet, there is no target centroid
         distances = np.array([np.linalg.norm(vert - agent.getPosition()) for vert in vor_metric.vor.filtered_points])
         if distances.size == 0:
-            return None
+            return None  # If there are no points in the voronoi tesselation, there is no target centroid
         idx = distances.argmin()
         return vor_metric.centroids[idx]
 
     def get_actions(self, agent: MazeAgent) -> tuple[float, float]:
         sensor: RelativeAgentSensor = self.parent.sensors[self.sensor_id]
 
+        # Ask the processor if, given the current sensor reading, the agent should
+        # query the voronoi tesselation for an updated target centroid location
         self.triggered = self.run_processor(sensor.current_state, 1 / sensor.r)
         self.triggered = 1
         agent.set_color_by_id(self.triggered)
         if self.triggered:
             vm: VoronoiRelaxation = self.cache_world_voronoi(agent.world)
-            self.nearest_centroid = self.find_nearest_centroid(vm, agent)
-            self.setpoint = self.nearest_centroid
+            self.setpoint = self.target_centroid(vm, agent)
 
         if self.setpoint is None:
-            return 0, 0
+            return 0, 0  # no move
 
         # basic PID control to go towards setpoint
-        ego = self.setpoint - agent.pos
-        angleto = np.arctan2(ego[1], ego[0])
-        derr = np.linalg.norm(ego)
-        werr = (angleto % (2 * np.pi)) - (agent.angle % (2 * np.pi))
-        v = self.vpid(derr)
-        w = self.wpid(werr)
+        ego = self.setpoint - agent.pos  # vector from target to agent
+        angleto = np.arctan2(ego[1], ego[0])  # global heading of above vector
+        derr = np.linalg.norm(ego)  # distance to target
+        werr = (angleto % (2 * np.pi)) - (agent.angle % (2 * np.pi))  # angle to target
+        # PID control
+        v = self.vpid(derr)  # slow down when approaching target
+        w = self.wpid(werr)  # turn towards target
+        # limit the speeds
         v = np.clip(v, -self.scale_v, self.scale_v)
         w = np.clip(w, -self.scale_w, self.scale_w)
 
