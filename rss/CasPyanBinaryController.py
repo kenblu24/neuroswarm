@@ -12,14 +12,18 @@ import casPYan.ende.rate as ende
 
 
 class CasPyanBinaryController(AbstractController):
+    default_inputs = 2
+    default_outputs = 4
+    default_neuro_tpc = 10
+    default_extra_ticks = 5
 
     def __init__(
         self,
         agent,
         parent=None,
         network: dict[str, Any] | None = None,
-        neuro_tpc: int | None = 10,
-        extra_ticks: int = 5,
+        neuro_tpc: int | None = None,
+        extra_ticks: int | None = None,
         neuro_track_all: bool = False,
         scale_forward_speed: float = 0.2,  # m/s forward speed factor
         scale_turning_rates: float = 2.0,  # rad/s turning rate factor
@@ -41,18 +45,18 @@ class CasPyanBinaryController(AbstractController):
         self.neuro_track_all = neuro_track_all
 
         # how many ticks the neuromorphic processor should run for
-        if neuro_tpc is None:
+        if neuro_tpc is not None:
+            self.neuro_tpc = neuro_tpc
+        else:
             try:
                 app_params = self.network.get_data("application")
                 self.neuro_tpc = app_params["encoder_ticks"]
             except RuntimeError as err:
                 raise RuntimeError("Could not find application parameters in network and no neuro_tpc specified.") from err
-        else:
-            self.neuro_tpc = neuro_tpc
         # now that we have the ticks per processor cycle, we can setup encoders & decoders
         self.setup_encoders()
 
-        self.extra_ticks = extra_ticks
+        self.extra_ticks = self.default_extra_ticks if extra_ticks is None else extra_ticks
 
         self.processor_params = self.network.get_data("processor")
         self.setup_processor(self.processor_params)
@@ -66,9 +70,11 @@ class CasPyanBinaryController(AbstractController):
         self.decoder: list
         self.processor: casPYan.Processor
 
-    @staticmethod  # to get encoder structure/#neurons for external network generation (EONS)
-    def get_default_encoders(neuro_tpc=1):
-        encoder_neurons, decoder_neurons = 2, 4
+    @classmethod  # to get encoder structure/#neurons for external network generation (EONS)
+    def get_default_encoders(cls, neuro_tpc=None):
+        encoder_neurons, decoder_neurons = cls.default_inputs, cls.default_outputs
+        if neuro_tpc is None:
+            neuro_tpc = cls.default_neuro_tpc
         encoders = [ende.RateEncoder(neuro_tpc, [0.0, 1.0]) for _ in range(encoder_neurons)]
         decoders = [ende.RateDecoder(neuro_tpc, [0.0, 1.0]) for _ in range(decoder_neurons)]
 
@@ -86,9 +92,8 @@ class CasPyanBinaryController(AbstractController):
         # for each binary raw input, we encode it to constant spikes on bins, kinda like traditional one-hot
         # Setup decoder
         # Read spikes to a discrete set of floats using rate-based decoding
-        x = self
-        encoders = x.get_default_encoders(self.neuro_tpc)
-        x.n_inputs, x.n_outputs, x.encoder, x.decoder = encoders
+        self.n_inputs, self.n_outputs, self.encoder, self.decoder = (
+            self.get_default_encoders(self.neuro_tpc))
 
     def setup_processor(self, pprops):
         # pprops = processor.get_configuration()

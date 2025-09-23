@@ -6,6 +6,7 @@ from typing import Any, override
 
 
 class CasPyanBinaryRemappedController(CasPyanBinaryController):
+    default_neuro_tpc = 1
 
     @override
     def run_processor(self, observation):

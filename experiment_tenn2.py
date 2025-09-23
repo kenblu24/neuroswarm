@@ -37,21 +37,18 @@ class ConnorMillingExperiment(TennExperiment):
         self.log_trajectories = args.log_trajectories
         self.use_caspian = getattr(args, 'caspian', True)
 
-        # register controller type with RSS
-        if self.use_caspian:
-            from rss.CaspianBinaryController import CaspianBinaryController
-            from rss.CaspianBinaryRemappedController import CaspianBinaryRemappedController
-            self.controller, self.controller_remapped = CaspianBinaryController, CaspianBinaryRemappedController
-        else:
-            from rss.CasPyanBinaryController import CasPyanBinaryController
-            from rss.CasPyanBinaryRemappedController import CasPyanBinaryRemappedController
-            self.controller, self.controller_remapped = CasPyanBinaryController, CasPyanBinaryRemappedController
-
-        self.n_inputs, self.n_outputs, _, _ = self.controller.get_default_encoders()
-
         self.start_paused = getattr(args, 'start_paused', False)
 
+        if args.action == "train":
+            self.bootstrap_from_simulate()
+
         self.log("initialized experiment_tenn2")
+
+    def bootstrap_from_simulate(self):
+        world = self.get_sample_world()
+        agent0 = world.population[0]
+        self.neuro_tpc = agent0.controller.neuro_tpc
+        self.n_inputs, self.n_outputs, _, _ = agent0.controller.get_default_encoders(self.neuro_tpc)
 
     def simulate(self, processor, network, init_callback=lambda x: x):
         # import rss.rss2 as rss
@@ -142,18 +139,20 @@ class ConnorMillingExperiment(TennExperiment):
 
     def save_network(self, net, path):
         if 'encoder_ticks' not in self.app_params:
-            world = self.get_sample_world(delete_rss=False)
-            self.app_params.update({'encoder_ticks': world.population[0].controller.neuro_tpc})
+            self.app_params.update({'encoder_ticks': self.neuro_tpc})
         super().save_network(net, path)
 
-    def get_sample_world(self, delete_rss=True):
-        import caspian
-        from common.tennnetwork import make_template
+    def get_sample_world(self, delete_rss=False):
+        if self.use_caspian:
+            import caspian
+            from common.tennnetwork import make_template
+            proc = caspian.Processor(self.processor_params)
+            template_net = make_template(proc, 0, 0)  # Give the controller an empty network
+        else:
+            raise NotImplementedError("TODO: get_sample_world for caspyan")
         cycles = self.cycles
         self.cycles = 0
-        proc = caspian.Processor(self.processor_params)
-        template_net = make_template(proc, self.n_inputs, self.n_outputs)
-        world = self.simulate(proc, template_net)
+        world = self.simulate(proc, template_net)  # The controller will not work, but have the correct number of inputs/outputs
         self.cycles = cycles
         if delete_rss:
             self.delete_rss()
@@ -166,7 +165,7 @@ class ConnorMillingExperiment(TennExperiment):
     def save_artifacts(self, evolver, *args, **kwargs):
         if super().save_artifacts(evolver, *args, **kwargs) is None:
             return
-        self.p.save_yaml_artifact("env.yaml", self.get_sample_world(delete_rss=False))
+        self.p.save_yaml_artifact("env.yaml", self.get_sample_world())
         self.delete_rss()
 
     def get_env_info(self):

@@ -34,5 +34,25 @@
             "args": ["train", "artifact_test", "--overwrite_project", "-p", "1", "--eons_seed", "20"],
             "justMyCode": false,
         },
+
+        {
+            "name": "Python Debugger: tenn2 train voronoi",
+            "type": "debugpy",
+            "request": "launch",
+            // "cwd": "/home/videblu/neuromorphic/turtwig",
+            "program": "experiment_tenn2.py",
+            "args": ["train", "voronoi_test", "--world", "rss/turbopi-voronoi/world.yaml", "--overwrite_project", "-p", "1"],
+            "justMyCode": false,
+        },
+
+        {
+            "name": "Python Debugger: tenn2 run voronoi",
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "program": "experiment_tenn2.py",
+            "args": ["run", "--world", "rss/turbopi-voronoi/world.yaml"],
+            "justMyCode": false,
+        },
     ]
 }
