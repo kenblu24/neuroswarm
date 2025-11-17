@@ -37,6 +37,12 @@ class ConnorMillingExperiment(TennExperiment):
         self.log_trajectories = args.log_trajectories
         self.use_caspian = getattr(args, 'caspian', True)
 
+        if self.agents is None and self.args.action != 'train':
+            try:
+                self.agents = self.p.experiment['agents']
+            except (KeyError, IndexError, FileNotFoundError, AttributeError):
+                pass
+
         # register controller type with RSS
         if self.use_caspian:
             from rss.CaspianBinaryController import CaspianBinaryController
@@ -53,10 +59,23 @@ class ConnorMillingExperiment(TennExperiment):
 
         self.log("initialized experiment_tenn2")
 
-    def simulate(self, processor, network, init_callback=lambda x: x):
-        # import rss.rss2 as rss
-        from swarmsim.config import register_dictlike_type
+    def fetch_world_config(self):
         from swarmsim.world.RectangularWorld import RectangularWorldConfig
+        from swarmsim import yaml
+        if self.args.action != 'train':
+            # try:
+            #     with open(self.p.artifacts / 'env.yaml', 'r') as f:
+            #         d = yaml.load(f)
+            # except FileNotFoundError:
+            #     pass
+            # config = RectangularWorldConfig.from_dict(d)
+            config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        else:
+            config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        return config
+
+    def simulate(self, processor, network, init_callback=None):
+        from swarmsim.config import register_dictlike_type
         from swarmsim.world.subscribers.WorldSubscriber import WorldSubscriber as WorldSubscriber
         from swarmsim.world.simulate import main as simulator
         from swarmsim import metrics
@@ -77,7 +96,7 @@ class ConnorMillingExperiment(TennExperiment):
             register_dictlike_type('controller', "CaspianBinaryRemappedController", CasPyanBinaryRemappedController)
 
         # setup world
-        config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        config = self.fetch_world_config()
         config.stop_at = self.cycles
         agent_config = config.spawners[0]['agent']
         agent_config['track_io'] = self.track_history
@@ -89,6 +108,7 @@ class ConnorMillingExperiment(TennExperiment):
 
         config.metrics = [
             metrics.Circliness(history=max(self.cycles, 1), avg_history_max=450),
+            # metrics.DelaunayDiffusion(history=max(self.cycles, 1)),
             # metrics.Aggregation(history=max(self.cycles, 1)),
             # metrics.DistanceSizeRatio(history=max(self.cycles, 1)),
         ]
@@ -108,16 +128,19 @@ class ConnorMillingExperiment(TennExperiment):
 
         world_subscriber = WorldSubscriber(func=callback)
 
-        # allow for callback to modify config
-        config = init_callback(config)
-
-        world = simulator(  # type:ignore[reportPrivateLocalImportUsage]  # run simulator
+        simargs = dict(
             world_config=config,
             subscribers=[world_subscriber],
             gui=gui,
             show_gui=bool(gui),
             start_paused=self.start_paused,
         )
+
+        # allow for callback to modify config
+        if callable(init_callback):
+            simargs = init_callback(self, simargs)
+
+        world = simulator(**simargs)  # run simulator
         return world
 
     def extract_fitness(self, world_output: RectangularWorld):
