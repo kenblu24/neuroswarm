@@ -63,7 +63,7 @@ class TennExperiment(Application):
             self.save_strategy = "one_best"
 
         # set project mode.
-        self.p: project.Project | project.FolderlessProject
+        self.p: project.UnzippedProject | project.FolderlessProject
         if args.project is None and args.network:
             # don't create a project folder. Some features will be unavailable.
             self.p = project.FolderlessProject(args.network, args.logfile)
