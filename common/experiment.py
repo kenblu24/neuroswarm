@@ -19,6 +19,14 @@ from . import project
 from . import env_tools as envt
 
 
+# typing
+from typing import TYPE_CHECKING, Any
+if TYPE_CHECKING:
+    from .evolver import Evolver, EpochInfo
+else:
+    Evolver = EpochInfo = None
+
+
 RE_CONTAINS_SEP = re.compile(r"[/\\]")
 DEFAULT_PROJECT_BASEPATH = pathlib.Path("out")
 
@@ -55,7 +63,7 @@ class TennExperiment(Application):
             self.save_strategy = "one_best"
 
         # set project mode.
-        self.p: project.Project | project.FolderlessProject
+        self.p: project.UnzippedProject | project.FolderlessProject
         if args.project is None and args.network:
             # don't create a project folder. Some features will be unavailable.
             self.p = project.FolderlessProject(args.network, args.logfile)
@@ -67,21 +75,25 @@ class TennExperiment(Application):
                 # no project name specified, so use the experiment name and timestamp
                 suffix = args.environment if args.pname_suffix is None else args.pname_suffix
                 project_name = f"{time.strftime('%y%m%d-%H%M%S')}{'-' + suffix if suffix else ''}"
-                self.p = project.Project(path=args.root / project_name, name=project_name)
+                self.p = project.UnzippedProject(path=args.root / project_name, name=project_name)
             elif args.project is None:
                 # no project name specified; ask user
                 path = project.inquire_project(root=args.root)
-                self.p = project.Project(path=path, name=path.name)
+                self.p = project.UnzippedProject(path=path, name=path.name)
             elif RE_CONTAINS_SEP.search(args.project):  # project name contains a path separator
                 project_name = pathlib.Path(args.project).name
                 if args.root is not DEFAULT_PROJECT_BASEPATH:
                     print("WARNING: You seem to have specified a root path AND a full project path.")
                     print(f"The root path will be ignored; path={args.project}")
-                self.p = project.Project(path=args.project, name=project_name)
+                self.p = project.UnzippedProject(path=args.project, name=project_name)
             else:
                 project_name = args.project
-                self.p = project.Project(path=args.root / project_name, name=project_name, overwrite=args.overwrite_project)
-            self.log_fitnesses = self.p.log_popfit  # type: ignore[reportAttributeAccessIssue] for if project is FolderlessProject
+                self.p = project.UnzippedProject(path=args.root / project_name, name=project_name, overwrite=args.overwrite_project)
+            if not self.p._original_path.exists():
+                msg = f"Project path {self.p._original_path} does not exist."
+                raise FileNotFoundError(msg)
+            self.p.unzip()  # no effect if not a zip file
+            self.log_fitnesses = self.p.log_popfit
 
         # app_params = ['encoder_ticks', ]
         self.app_params = dict()
@@ -114,6 +126,22 @@ class TennExperiment(Application):
             self.p.make_root_interactive()
             self.p.check_bestnet_writable()
 
+        if args.live_netviz:
+            import subprocess
+            args.all_counts_stream = '{"source": "serve", "port": 8100}'
+            framework_root = envt.framework_root()
+            net_path = self.p.bestnet_file.path.absolute()
+            viz_cmd = [
+                'love', '.',
+                # '--config', CONFIG_FILE,
+                '-n', net_path,
+                '--show_input_id',
+                '--show_output_id',
+                '-i', '{"source":"request","port":"8100","host":"localhost"}',
+                '--remove_unnecessary_neuron'
+            ]
+            subprocess.Popen(viz_cmd, cwd=framework_root / 'viz')
+
         if args.all_counts_stream is not None:
             self.iostream = neuro.IO_Stream()
             j = jst.smartload(args.all_counts_stream)
@@ -137,14 +165,17 @@ class TennExperiment(Application):
     def run(self, processor, network):
         return None
 
-    def pre_epoch(self, eons):
-        if self.save_strategy == "all":
-            for nid, net in enumerate(eons.pop.networks):
-                self.save_network(net.network, self.p.networks.get_file(eons.i, nid))  # type: ignore[reportAttributeAccessIssue] for if project is FolderlessProject
+    def pre_epoch(self, eons: Evolver):
+        pass
 
-    def post_epoch(self, eons, info, new_best):  # eons calls this after each epoch
-        if self.save_strategy == "best_per_epoch":
-            self.save_network(info.best_network, self.p.networks.get_file(info.i, info.best_net_id)) # type: ignore[reportAttributeAccessIssue] for if project is FolderlessProject
+    def post_epoch(self, eons: Evolver, info: EpochInfo, new_best: bool | Any):  # eons calls this after each epoch
+        if self.save_strategy == "all":
+            # save all networks to networks/e{epoch}-{network_id}.json
+            for nid, net in enumerate(eons.pop.networks):
+                self.save_network(net.network, self.p.networks.get_file(info.i, nid))
+        elif self.save_strategy == "best_per_epoch":
+            # save only the best network as networks/e{epoch}-{network_id}.json
+            self.save_network(info.best_network, self.p.networks.get_file(info.i, info.best_net_id))
         if new_best:  # save best network to its own file regardless of save_strategy
             self.save_best_network(info, safe_overwrite=True)
         self.log_status(info)  # print and log epoch info
@@ -155,11 +186,11 @@ class TennExperiment(Application):
             net.set_data("label", self.label)
         net.set_data("processor", self.processor_params)
         net.set_data("application", self.app_params)
-        self.p.bestnet = net
         path.write(str(net))
 
     def save_best_network(self, info, safe_overwrite=True):
         self.p.backup_bestnet()
+        self.p.bestnet = info.best_network
         self.save_network(info.best_network, self.p.bestnet_file)
         self.log(f"wrote best network to {str(self.p.bestnet_file)}.")
 
@@ -343,6 +374,12 @@ def get_parsers(conflict_handler='resolve'):
             info to iostream for network visualization.
             e.g. '{"source":"serve","port":8100}'
         """)
+        sub.add_argument('--explore', action='store_true',
+                         help="Show the Project Folder after the run.")
+
+    # Run-only args
+    sub_run.add_argument('--live_netviz', action='store_true',
+                         help="Show a visualization of the network in the lua app.")
 
     # Training args
     sub_train.add_argument('--network', default=None,

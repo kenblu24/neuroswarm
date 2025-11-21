@@ -37,6 +37,12 @@ class ConnorMillingExperiment(TennExperiment):
         self.log_trajectories = args.log_trajectories
         self.use_caspian = getattr(args, 'caspian', True)
 
+        if self.agents is None and self.args.action != 'train':
+            try:
+                self.agents = self.p.experiment['agents']
+            except (KeyError, IndexError, FileNotFoundError, AttributeError):
+                pass
+
         # register controller type with RSS
         if self.use_caspian:
             from rss.CaspianBinaryController import CaspianBinaryController
@@ -53,10 +59,23 @@ class ConnorMillingExperiment(TennExperiment):
 
         self.log("initialized experiment_tenn2")
 
-    def simulate(self, processor, network, init_callback=lambda x: x):
-        # import rss.rss2 as rss
-        from swarmsim.config import register_dictlike_type
+    def fetch_world_config(self):
         from swarmsim.world.RectangularWorld import RectangularWorldConfig
+        from swarmsim import yaml
+        if self.args.action != 'train':
+            # try:
+            #     with open(self.p.artifacts / 'env.yaml', 'r') as f:
+            #         d = yaml.load(f)
+            # except FileNotFoundError:
+            #     pass
+            # config = RectangularWorldConfig.from_dict(d)
+            config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        else:
+            config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        return config
+
+    def simulate(self, processor, network, init_callback=None):
+        from swarmsim.config import register_dictlike_type
         from swarmsim.world.subscribers.WorldSubscriber import WorldSubscriber as WorldSubscriber
         from swarmsim.world.simulate import main as simulator
         from swarmsim import metrics
@@ -77,7 +96,7 @@ class ConnorMillingExperiment(TennExperiment):
             register_dictlike_type('controller', "CaspianBinaryRemappedController", CasPyanBinaryRemappedController)
 
         # setup world
-        config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        config = self.fetch_world_config()
         config.stop_at = self.cycles
         agent_config = config.spawners[0]['agent']
         agent_config['track_io'] = self.track_history
@@ -89,7 +108,9 @@ class ConnorMillingExperiment(TennExperiment):
 
         config.metrics = [
             metrics.Aggregation(history=450),
-            metrics.Circliness(history=max(self.cycles, 1), avg_history_max=450),
+            # metrics.Circliness(history=max(self.cycles, 1), avg_history_max=450),
+            # metrics.DelaunayDiffusion(history=max(self.cycles, 1)),
+            # metrics.Aggregation(history=max(self.cycles, 1)),
             # metrics.DistanceSizeRatio(history=max(self.cycles, 1)),
         ]
 
@@ -97,8 +118,8 @@ class ConnorMillingExperiment(TennExperiment):
             a = world.selected
             if a and self.iostream:
                 self.iostream.write_json({
-                    "Neuron Alias": a.neuron_ids,
-                    "Event Counts": a.neuron_counts
+                    "Neuron Alias": a.controller.neuron_ids,
+                    "Event Counts": a.controller.neuron_counts
                 })
 
         gui = TennlabGUI(x=0, y=0, h=0, w=300)
@@ -108,16 +129,19 @@ class ConnorMillingExperiment(TennExperiment):
 
         world_subscriber = WorldSubscriber(func=callback)
 
-        # allow for callback to modify config
-        config = init_callback(config)
-
-        world = simulator(  # type:ignore[reportPrivateLocalImportUsage]  # run simulator
+        simargs = dict(
             world_config=config,
             subscribers=[world_subscriber],
             gui=gui,
             show_gui=bool(gui),
             start_paused=self.start_paused,
         )
+
+        # allow for callback to modify config
+        if callable(init_callback):
+            simargs = init_callback(self, simargs)
+
+        world = simulator(**simargs)  # run simulator
         return world
 
     def extract_fitness(self, world_output: RectangularWorld):
@@ -152,7 +176,7 @@ class ConnorMillingExperiment(TennExperiment):
         cycles = self.cycles
         self.cycles = 0
         proc = caspian.Processor(self.processor_params)
-        template_net = make_template(proc, self.n_inputs, self.n_outputs)
+        template_net = make_template(proc, self.n_inputs, self.n_outputs, ...)
         world = self.simulate(proc, template_net)
         self.cycles = cycles
         if delete_rss:
@@ -205,9 +229,17 @@ def run(app, args):
     print(f"Fitness: {fitness:8.4f}")
 
     if args.log_trajectories:
+        import matplotlib.pyplot as plt
         graphing.plot_multiple(world)
+        graphing.plot_fitness(world)
         graphing.export(world, output_file=app.p.ensure_file_parents("agent_trajectories.xlsx"))
+        if args.explore:
+            app.p.explore()
+        plt.show(block=True)
         # TODO: handle when no project
+    else:
+        if args.explore:
+            app.p.explore()
 
     return fitness
 
