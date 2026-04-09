@@ -60,19 +60,23 @@ class ConnorMillingExperiment(TennExperiment):
 
         self.log("initialized experiment_tenn2")
 
-    def fetch_world_config(self):
+    def fetch_world_config(self, override=None):
         from swarmsim.world.RectangularWorld import RectangularWorldConfig
         from swarmsim import yaml
+        with open(self.world_yaml, 'r') as f:
+            d = yaml.load(f)
         if self.args.action != 'train':
             # try:
             #     with open(self.p.artifacts / 'env.yaml', 'r') as f:
             #         d = yaml.load(f)
             # except FileNotFoundError:
             #     pass
-            # config = RectangularWorldConfig.from_dict(d)
             config = RectangularWorldConfig.from_yaml(self.world_yaml)
         else:
             config = RectangularWorldConfig.from_yaml(self.world_yaml)
+        if override is not None:
+            d.update(yaml.load(override))
+        config = RectangularWorldConfig.from_dict(d)
         return config
 
     def simulate(self, processor, network, init_callback=None):
@@ -97,7 +101,7 @@ class ConnorMillingExperiment(TennExperiment):
             register_dictlike_type('controller', "CaspianBinaryRemappedController", CasPyanBinaryRemappedController)
 
         # setup world
-        config = self.fetch_world_config()
+        config = self.fetch_world_config(override=self.args.world_overlay)
         config.stop_at = self.cycles
         agent_config = config.spawners[0]['agent']
         agent_config['track_io'] = self.track_history
@@ -324,6 +328,8 @@ def get_parsers(parser, subpar):
                          type=int, help="# of agents to run with.",)
         sub.add_argument('--world_yaml', default="rss/turbopi-milling/world.yaml",
                          type=str, help="path to yaml config for sim")
+        sub.add_argument('--world_overlay',
+                         type=str, help="yaml/json string to overlay onto world.yaml")
         sub.add_argument('--behavior', default=0, help="behavior to run. Either int or string matching a behavior name.")
 
     # for key in ('test', 'run'):  # arguments that apply to test/validation and stdin
