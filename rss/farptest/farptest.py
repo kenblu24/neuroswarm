@@ -17,7 +17,7 @@ from swarmsim.world.simulate import main as simulator
 cwd = Path(__file__).resolve().parent
 config = RectangularWorldConfig.from_yaml_template(
     cwd / "world.yaml",
-    m='ttc',
+    m='ttd',
     evader='pid',
 )
 
@@ -25,7 +25,7 @@ config = RectangularWorldConfig.from_yaml_template(
 # gui.position = "sidebar_right"
 
 
-def test_single(config):
+def test_single(config, show_gui=False):
     tempconfig = copy.deepcopy(config)
     # config.seed += i
     stats = Counter()
@@ -33,7 +33,7 @@ def test_single(config):
         world_config=tempconfig,
         subscribers=[],
         # gui=gui,
-        show_gui=True,
+        show_gui=show_gui,
         start_paused=False,
         framerate_limit=20,
     )  # run simulator
@@ -80,10 +80,7 @@ def test_seq(samples=10):
         configs.append(tempconfig)
     for i, cfg in enumerate(configs):
         print(i)
-        ret_arr = test_single(cfg)
-    stats, ttcs = zip(*ret_arr)
-    print('n: ', n, sum(stats, Counter()))
-    for stat in stats:
+        stat, time = test_single(cfg, show_gui=True)
         results.append({
             'n': n,
             **stat
@@ -148,6 +145,9 @@ def run():
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--n', type=int, default=100)
     # test_mp()
     # test_grid()
     # test_seq()
