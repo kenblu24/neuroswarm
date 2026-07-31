@@ -14,10 +14,11 @@ agents:
   target_teams:
   - red
 spawners:
-- type: UniformAgentSpawner
+- type: UniformCircleAgentSpawner
   n: <{ n|default(6) }>  # default number of agents BUT may be overridden by user args
   facing: away
-  region: [[4.4, 4.4], [4.4, 5.6], [5.6, 5.6], [5.6, 4.4]]
+  center: [5.0, 5.0]
+  radius: 1.4
   agent:
     type: MazeAgent
     sensors:
@@ -66,7 +67,6 @@ spawners:
   agent:
     type: MazeAgent
     name: intruder
-    #%> set evader = evader|default('pid')
     team: red
     agent_radius: !np 0.2 / 2
     body_color:
@@ -74,30 +74,19 @@ spawners:
       - 20
       - 30
     body_filled: true
-    sensors:
-    - type: Targeter
-      attribute: position
-      target_name: goal
-      hold: holdfirst
-      store_history: false
-      <% if evader == 'binary' %>
-    - type: BinaryFOVSensor
-      theta: 0.45  # Vision Angle / 2 (Radians)
-      distance: 1.0  # meters. previously 2.55
-      show: true
-      bias: 0
-      store_history: false
-      target_team: blue
+    sensors: !include red_sensors.yaml
+    #%> set evader = evader|default('pid')
+    #%> if evader == 'binary'
     controller:
       type: BinaryController
       a: [0.2, 0.2]
       b: [0.2, 0]
       sensor_id: 0
-    <% elif evader == 'human' %>
+    #%> elif evader == 'human'
     controller:
       type: HumanController
       joystick: 0
-    <% elif evader == 'pid' %>
+    #%> elif evader == 'pid'
     controller:
       type: WaypointPIDController
       sensor_id: 0
@@ -112,10 +101,13 @@ spawners:
         d: 0.0
         min: -1.0
         max: 1.0
-    <% endif %>
+    #%> elif evader == 'custom'
+    controller:
+      !include red_controller.yaml
+    #%> endif
 metadata:
   hash: _hash
-#%> set metricfile = m|default('ttd')
+#%> set metricfile = m|default('detected')
 #%> set cycles = cycles|default(1000)
 # %> set cycles = 99999
 <<: !include <{ metricfile }>.yaml

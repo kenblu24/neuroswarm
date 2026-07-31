@@ -32,4 +32,4 @@ cd turtwig
 export MAKE_PARENTS=true
 
 ## Run your program or script
-python experiment_tenn2.py train --root /scratch/kzhu4/6  -p 48 --save_best --epochs 500 --eons_seed 25 -N 6  --pname_suffix farp1-es25_n6_trial10 --world rss/farp1/world.yaml --trial 10
+python experiment_tenn2.py train --root /scratch/kzhu4/6  -p 48 --save_all --epochs 500 --eons_seed 25 -N 6  --pname_suffix farp2-es25_n6_trial10 --world rss/farp/world.yaml --trial 10
