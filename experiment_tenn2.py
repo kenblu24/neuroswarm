@@ -87,26 +87,13 @@ class ConnorMillingExperiment(TennExperiment):
             return
         self.seeds = np.random.default_rng(seed).integers(0, 2**32, size=self.args.trials).tolist()
 
-    def fetch_world_config(self):
+    def fetch_world_config(self, **kwargs):
         from swarmsim.world.RectangularWorld import RectangularWorldConfig
-        from swarmsim import yaml
-        if self.args.action != 'train':
-            # try:
-            #     with open(self.p.artifacts / 'env.yaml', 'r') as f:
-            #         d = yaml.load(f)
-            # except FileNotFoundError:
-            #     pass
-            # config = RectangularWorldConfig.from_dict(d)
-            config = RectangularWorldConfig.from_yaml_template(self.world_yaml, **self.jinja_vars)
-        else:
-            config = RectangularWorldConfig.from_yaml_template(self.world_yaml, **self.jinja_vars)
-        return config
+        return RectangularWorldConfig.from_yaml_template(self.world_yaml, **(self.jinja_vars | kwargs))
 
     def simulate(self, processor, network, init_callback=None):
-        from swarmsim.config import register_dictlike_type
+        from swarmsim import register_dictlike_type, run_sim
         from swarmsim.world.subscribers.WorldSubscriber import WorldSubscriber as WorldSubscriber
-        from swarmsim.world.simulate import main as simulator
-        from swarmsim import metrics
 
         # setup network
         network.set_data("processor", self.processor_params)
@@ -156,7 +143,7 @@ class ConnorMillingExperiment(TennExperiment):
             or hasattr(self, 'init_callback') and (init_callback := self.init_callback)):
             simargs = init_callback(self, simargs)
 
-        world = simulator(**simargs)  # run simulator
+        world = run_sim(**simargs)  # run simulator
         return world
 
     @staticmethod
@@ -192,11 +179,11 @@ class ConnorMillingExperiment(TennExperiment):
         return metric.average if getattr(metric, 'default_aggregation', None) == 'average' else metric.value
 
     @override
-    def fitness(self, processor, network, init_callback=None, return_multi=False, agg=sum):
+    def fitness(self, processor, network, eons_i=1, init_callback=None, return_multi=False, agg=sum,):
+        def modify_seed(self, simargs, seed):
+            simargs['world_config'].seed = None if seed is None else seed * eons_i
+            return init_callback(self, simargs) if init_callback else simargs
         if self.seeds:
-            def modify_seed(self, simargs, seed):
-                simargs['world_config'].seed = seed
-                return init_callback(self, simargs) if init_callback else simargs
             worlds = [self.simulate(processor, network, partial(modify_seed, seed=seed))
                       for seed in self.seeds]
             if return_multi:
@@ -205,7 +192,8 @@ class ConnorMillingExperiment(TennExperiment):
                 return worlds, metrics, fitnesses
             return agg([self.extract_fitness(world, self.args.behavior) for world in worlds])
         else:
-            world_final_state = self.simulate(processor, network, init_callback)
+            seed = self.fetch_world_config().seed
+            world_final_state = self.simulate(processor, network, partial(modify_seed, seed=seed))
             if return_multi:
                 metric = self.pick_metric(world_final_state, self.args.behavior)
                 return world_final_state, metric, self.extract_fitness(world_final_state, metric)
