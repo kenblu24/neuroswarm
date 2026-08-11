@@ -150,13 +150,15 @@ class ConnorMillingExperiment(TennExperiment):
     def init_callback(self, simargs):
         return simargs
 
-    def pick_metric(self, world, behavior: int | str | type[AbstractMetric] = 0):
+    def pick_metric(self, world: RectangularWorld,
+                    behavior: int | str | AbstractMetric | type[AbstractMetric] = 0) -> AbstractMetric:
         if behavior in world.metrics:
+            behavior: AbstractMetric = behavior
             return behavior
-        if isinstance(behavior, type):
-            behavior = behavior.name
         if isinstance(behavior, int):
             return world.metrics[behavior]
+        if isinstance(behavior, type):
+            behavior = behavior.name
         elif isinstance(behavior, str) and behavior:
             # set metric to the first metric with the given name, or raise an error
             for metric in world.metrics:
@@ -171,7 +173,7 @@ class ConnorMillingExperiment(TennExperiment):
         msg = f"behavior must be int, str, or type[AbstractMetric]. Got {type(behavior)}"
         raise TypeError(msg)
 
-    def extract_fitness(self, world_output: RectangularWorld, behavior: int | str | type[AbstractMetric] = 0):
+    def extract_fitness(self, world_output: RectangularWorld, behavior: int | str | AbstractMetric | type[AbstractMetric] = 0):
         metric: AbstractMetric = self.pick_metric(world_output, behavior)
         self.run_info = metric.value_history if world_output.metrics else None
         if not world_output.metrics:
@@ -179,11 +181,12 @@ class ConnorMillingExperiment(TennExperiment):
         return metric.average if getattr(metric, 'default_aggregation', None) == 'average' else metric.value
 
     @override
-    def fitness(self, processor, network, eons_i=1, init_callback=None, return_multi=False, agg=sum,):
+    def fitness(self, processor, network, seed_mod=1, init_callback=None, return_multi=False, agg=sum,):
         def modify_seed(self, simargs, seed):
-            simargs['world_config'].seed = None if seed is None else seed * eons_i
+            simargs['world_config'].seed = None if seed is None else seed * seed_mod
             return init_callback(self, simargs) if init_callback else simargs
         if self.seeds:
+            # in this case, seed_mod is the eons generation
             worlds = [self.simulate(processor, network, partial(modify_seed, seed=seed))
                       for seed in self.seeds]
             if return_multi:
@@ -192,7 +195,7 @@ class ConnorMillingExperiment(TennExperiment):
                 return worlds, metrics, fitnesses
             return agg([self.extract_fitness(world, self.args.behavior) for world in worlds])
         else:
-            seed = self.fetch_world_config().seed
+            seed = self.fetch_world_config().seed if seed_mod == 1 else seed_mod
             world_final_state = self.simulate(processor, network, partial(modify_seed, seed=seed))
             if return_multi:
                 metric = self.pick_metric(world_final_state, self.args.behavior)
@@ -375,7 +378,7 @@ def get_parsers(parser, subpar):
     # Testing args
     sp['test'].add_argument('--positions', default=None,
                              help="file containing agent positions")
-    sp['test'].add_argument('-p', '--processes', type=int, default=1,
+    sp['test'].add_argument('-p', '--processes', type=int, default=None,
                            help="number of threads for concurrent fitness evaluation.")
 
     return parser, subpar
