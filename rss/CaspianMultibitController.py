@@ -15,8 +15,6 @@ class CaspianMultibitController(AbstractController):
 
     def __init__(
         self,
-        agent,
-        parent=None,
         network: dict[str, Any] | None = None,
         neuro_tpc: int | None = 10,
         extra_ticks: int = 5,
@@ -28,7 +26,7 @@ class CaspianMultibitController(AbstractController):
         # if config is None:
         #     config = MazeAgentCaspianConfig()
 
-        super().__init__(agent=agent, parent=parent)
+        super().__init__()
 
         self.sensor_ids = sensor_ids
 
