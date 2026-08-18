@@ -4,5 +4,6 @@ pandas
 openpyxl
 pyyaml
 inquirerpy
+textual
 caspyan
 show-in-file-manager
