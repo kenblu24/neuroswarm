@@ -39,7 +39,7 @@ bhvr = 'mill'
 behavior = 'Circliness'
 
 configs = []
-for eons_seed, swarm_size in product(eons_seeds, swarm_sizes):
+for swarm_size, eons_seed in product(swarm_sizes, eons_seeds):
     projname = f"{bhvr}-es{eons_seed}-t1-n{swarm_size}"
     configs.append(dict(
         eons_seed=eons_seed,
@@ -47,17 +47,17 @@ for eons_seed, swarm_size in product(eons_seeds, swarm_sizes):
         bhvr=bhvr,
         behavior=behavior,
         projname=projname,
-        projpath=str(scratch / f'{bhvr}/{swarm_size}' / projname),
+        projpath=scratch / f'{bhvr}/{swarm_size}' / projname,
     ))
 
-pd.DataFrame(configs)  # show
+print(pd.DataFrame(configs))
 
 for d in configs:
     slurm = template.render(**d)
-    print(slurm)
     projpath = d['projpath']
     print(projpath)
     projpath.mkdir(parents=True, exist_ok=True)
     with open(f"{d['projpath']}/sbatch.slurm", 'w') as f:
         f.write(slurm)
     subprocess.run(f"sbatch {d['projpath']}/sbatch.slurm", shell=True)
+    break
