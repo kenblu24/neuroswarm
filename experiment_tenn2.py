@@ -10,7 +10,7 @@ from tqdm.contrib.concurrent import process_map
 from tqdm import tqdm
 
 # Provided Python utilities from tennlab framework/examples/common
-from common.experiment import TennExperiment
+from common.experiment import TennExperiment, caststring
 import common.experiment
 from common import env_tools as envt
 
@@ -359,7 +359,8 @@ def get_parsers(parser, subpar):
                          type=int, help="# of agents to run with.",)
         sub.add_argument('--world_yaml', default="rss/turbopi-milling/world.yaml",
                          type=str, help="path to yaml config for sim")
-        sub.add_argument('--behavior', default=0, help="behavior to run. Either int or string matching a behavior name.")
+        sub.add_argument('--behavior', default=0, type=partial(caststring, int),
+                         help="behavior to run. Either int or string matching a behavior name.")
         sub.add_argument('--trials', type=int, default=None,
                          help="number of trials to run. Set to None to run one trial with world.yaml[seed]."
                          " Values greater than 0 will use the world.yaml[seed] to generate more seeds.")
