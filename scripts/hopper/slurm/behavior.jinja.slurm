@@ -12,8 +12,8 @@
 
 ## Separate output and error messages into 2 files.`
 ## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID`
-#SBATCH --output=/scratch/%u/%x-%N-%j.out  # Output file`
-#SBATCH --error=/scratch/%u/%x-%N-%j.err   # Error file`
+#SBATCH --output={{ projpath }}/%x-%N-%j.out  # Output file`
+#SBATCH --error={{ projpath }}/%x-%N-%j.err   # Error file`
 
 ## Slurm can send you updates via email
 #SBATCH --mail-type=BEGIN,END,FAIL         # ALL,NONE,BEGIN,END,FAIL,REQUEUE,..
@@ -35,4 +35,5 @@ export MAKE_PARENTS=true
 export PROJ_EXIST_OKAY=true
 
 ## Run your program or script
-python experiment_tenn2.py train {{ projpath }} -p 48 --save_best --epochs 2000 --eons_seed {{ eons_seed }} -N {{ N }} --behavior {{ behavior }}
+python experiment_tenn2.py train {{ projpath }} -p 48 --save_best --epochs 2000\
+ --eons_seed {{ eons_seed }} -N {{ N }}\ --behavior {{ behavior }} --cycles 1500 --rngstrat {{ rngstrat|default('TS1') }}

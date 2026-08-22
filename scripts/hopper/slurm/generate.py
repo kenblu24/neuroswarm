@@ -22,35 +22,43 @@ swarm_sizes = [
     4,
     5,
     6,
-    # 7,
-    # 8,
-    # 9,
+    7,
+    8,
+    9,
     10,
-    # 15,
-    # 20,
-    # 25,
-    # 30,
-    # 35,
-    # 40,
-    # 45,
+    15,
+    20,
+    25,
+    30,
+    35,
+    40,
+    45,
     50,
+]
+rngstrats = [
+    'TS1',
+    # 'TSG',
+    # 'TSR',
 ]
 bhvr = 'mill'
 behavior = 'Circliness'
 
 configs = []
-for swarm_size, eons_seed in product(swarm_sizes, eons_seeds):
-    projname = f"{bhvr}-es{eons_seed}-t1-n{swarm_size}"
+for swarm_size, eons_seed, rngstrat in product(swarm_sizes, eons_seeds, rngstrats):
+    projname = f"{bhvr}-es{eons_seed}-{rngstrat}-n{swarm_size}"
     configs.append(dict(
         eons_seed=eons_seed,
         N=swarm_size,
         bhvr=bhvr,
         behavior=behavior,
         projname=projname,
+        jobname=projname,
         projpath=scratch / f'{bhvr}/{swarm_size}' / projname,
+        rngstrat=rngstrat,
     ))
 
 print(pd.DataFrame(configs))
+input('Press enter to continue or ctrl-c to cancel.')
 
 for d in configs:
     slurm = template.render(**d)
@@ -60,4 +68,3 @@ for d in configs:
     with open(f"{d['projpath']}/sbatch.slurm", 'w') as f:
         f.write(slurm)
     subprocess.run(f"sbatch {d['projpath']}/sbatch.slurm", shell=True)
-    break

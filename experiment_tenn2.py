@@ -171,8 +171,8 @@ class ConnorMillingExperiment(TennExperiment):
 
     @override
     def fitness(self, processor, network, eons_i=None, init_callback=None, return_multi=False, agg=sum,):
-        config_seed = cfg.seed if hasattr((cfg := self.fetch_world_config()), 'seed') and self.args.rngstrat != 'TR' else None
-        eons_i = None if self.args.rngstrat != 'TG' else eons_i
+        config_seed = cfg.seed if hasattr((cfg := self.fetch_world_config()), 'seed') and self.args.rngstrat != 'TSR' else None
+        eons_i = None if self.args.rngstrat != 'TSG' else eons_i
         base_seed = None if config_seed is None else config_seed + (eons_i or 0)
         if self.args.trials:  # multiple trials/simulations/fitnesses
             # in this case, seed_mod is the eons generation
@@ -356,7 +356,7 @@ def get_parsers(parser, subpar):
 
     # Training args
     sp['train'].add_argument('--label', help="[train] label to put into network JSON (key = label).")
-    sp['train'].add_argument('--rngstrat', choices=['T1', 'TG', 'TR'],)
+    sp['train'].add_argument('--rngstrat', choices=['TS1', 'TSG', 'TSR'],)
 
     sp['run'].add_argument('--track_history', action='store_true',
                            help="pass this to enable sensor vs. output plotting.")
