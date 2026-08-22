@@ -20,7 +20,7 @@ import rss.graphing as graphing
 # typing:
 from typing import override
 from swarmsim.world.RectangularWorld import RectangularWorld
-from swarmsim.metrics.AbstractMetric import AbstractMetric
+from swarmsim.metrics.metric import Metric
 
 from common.argparse import ArgumentError
 
@@ -140,9 +140,9 @@ class ConnorMillingExperiment(TennExperiment):
         return simargs
 
     def pick_metric(self, world: RectangularWorld,
-                    behavior: int | str | AbstractMetric | type[AbstractMetric] = 0) -> AbstractMetric:
+                    behavior: int | str | Metric | type[Metric] = 0) -> Metric:
         if behavior in world.metrics:
-            behavior: AbstractMetric = behavior
+            behavior: Metric = behavior
             return behavior
         if isinstance(behavior, int):
             return world.metrics[behavior]
@@ -159,11 +159,11 @@ class ConnorMillingExperiment(TennExperiment):
             else:
                 msg = f"Could not find metric '{behavior}' in world metrics"
                 raise IndexError(msg)
-        msg = f"behavior must be int, str, or type[AbstractMetric]. Got {type(behavior)}"
+        msg = f"behavior must be int, str, or type[Metric]. Got {type(behavior)}"
         raise TypeError(msg)
 
-    def extract_fitness(self, world_output: RectangularWorld, behavior: int | str | AbstractMetric | type[AbstractMetric] = 0):
-        metric: AbstractMetric = self.pick_metric(world_output, behavior)
+    def extract_fitness(self, world_output: RectangularWorld, behavior: int | str | Metric | type[Metric] = 0):
+        metric: Metric = self.pick_metric(world_output, behavior)
         self.run_info = metric.value_history if world_output.metrics else None
         if not world_output.metrics:
             return float('nan')
