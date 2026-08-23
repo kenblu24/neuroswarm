@@ -112,7 +112,10 @@ class ConnorMillingExperiment(TennExperiment):
                     "Event Counts": a.controller.neuron_counts
                 })
 
-        gui = TennlabGUI(x=0, y=0, h=0, w=300)
+        if self.args.quick_viz:
+            gui = TennlabGUI(x=0, y=0, h=0, w=300)
+        else:
+            gui = TennlabGUI(x=0, y=0, h=0, w=300)
         gui.position = "sidebar_right"
         if self.viz is False or self.noviz:
             gui = False
