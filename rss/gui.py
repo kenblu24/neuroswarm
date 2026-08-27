@@ -41,12 +41,16 @@ class TennlabGUI(DifferentialDriveGUI):
         self.artists = {}
         self.last_drawn = -1
 
+
     # def set_selected(self, agent: MazeAgentCaspian):
     #     super().set_selected(agent)
 
     @override
-    def draw(self, screen, zoom=1.0):
-        super().draw(screen, zoom)
+    def draw(self, screen, draw_world=True):
+        if draw_world:
+            self.world.draw(screen)
+    
+        super().draw(screen)
         if pygame.font:
             if self.selected:
                 a: MazeAgent = self.selected[0]
@@ -184,7 +188,18 @@ class TennlabGUI(DifferentialDriveGUI):
         label_vwx((self.fig, self.axs),
                   title=f"Agent {self.selected[0].name} Sensor State and Speeds")
 
+class VizTrailTennGUI(DifferentialDriveGUI):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.trails = VizTrail(window=None)
 
+    def draw(self, screen, draw_world=True):
+        self.trails.draw(screen, self.world)
+        if draw_world:
+            self.world.draw(screen)
+        
+        super().draw(screen, False)
+    
 
 class VizTrail:
     def __init__(self, interval: int = 2, window: int | None = None, opacity=0.5):
@@ -198,7 +213,7 @@ class VizTrail:
         self.window = window
         self.opacity = opacity
 
-    def _update_positions(self, world, screen_size):
+    def update(self, world, screen_size):
         for agent in world.population:
             if agent.name not in self.agent_pos:
                 self.agent_pos[agent.name] = []
@@ -207,12 +222,17 @@ class VizTrail:
             self.agent_pos[agent.name].append((agent.getPosition().copy(), agent.angle))
 
     def draw(self, screen: pygame.Surface, world):
+        if screen is None:
+            # NOTE: screen is not provided in headless mode but tracking the trails is still important
+            # NOTE: assuming a default size of (800, 600)
+            self.update(world, (800, 600))
+            return
+        
+        if self.timesteps % self.interval == 0:
+            self.update(world, screen.get_size())
+
         def color_hsla(color: pygame.Color, angle_rad: float, s=0.5, l=0.5):
             color.hsla = np.rad2deg(angle_rad)%360., s*100., l*100., self.opacity*100.
-
-        if self.timesteps % self.interval == 0:
-            self._update_positions(world, screen.get_size())
-
         pan, zoom = world.pos, world.zoom
         surface = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
         color = pygame.Color("white")
@@ -229,7 +249,3 @@ class VizTrail:
         self.timesteps += 1
         for _, surface in self.agent_cfg.values():
             screen.blit(surface, pan)
-
-
-class VizTrailTennGUI(TennlabGUI):
-    pass

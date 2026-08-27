@@ -1,28 +1,28 @@
-from io import BytesIO
 import os
-import numpy as np
 from functools import partial
-# import matplotlib.pyplot as plt
-
-# import caspian
-
-from tqdm.contrib.concurrent import process_map
-from tqdm import tqdm
-
-# Provided Python utilities from tennlab framework/examples/common
-from common.experiment import TennExperiment, caststring
-import common.experiment
-from common import env_tools as envt
-
-from rss.gui import TennlabGUI
-import rss.graphing as graphing
+from io import BytesIO
 
 # typing:
 from typing import override
-from swarmsim.world.RectangularWorld import RectangularWorld
-from swarmsim.metrics.AbstractMetric import AbstractMetric
 
+import numpy as np
+import pygame
+from swarmsim.metrics.abstractmetric import AbstractMetric
+from swarmsim.world.RectangularWorld import RectangularWorld
+from tqdm import tqdm
+
+# import matplotlib.pyplot as plt
+# import caspian
+from tqdm.contrib.concurrent import process_map
+
+import common.experiment
+import rss.graphing as graphing
+from common import env_tools as envt
 from common.argparse import ArgumentError
+
+# Provided Python utilities from tennlab framework/examples/common
+from common.experiment import TennExperiment, caststring
+from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI
 
 
 class ConnorMillingExperiment(TennExperiment):
@@ -41,6 +41,14 @@ class ConnorMillingExperiment(TennExperiment):
         self.use_caspian = getattr(args, 'caspian', True)
         self.jinja_vars = {}
         self.process_jinja_vars()
+
+        # self.trails = VizTrail(window=None) if self.args.viz_trails else None
+        self.show_gui = True
+        if self.viz is False or self.noviz:
+            self.show_gui = False
+
+        self.gui = VizTrailTennGUI(x=0, y=0, h=0, w=300) if self.args.viz_trails else TennlabGUI(x=0, y=0, h=0, w=300)
+        self.gui.position = "sidebar_right"
 
         if self.agents is None and self.args.action != 'train':
             try:
@@ -112,23 +120,25 @@ class ConnorMillingExperiment(TennExperiment):
                     "Event Counts": a.controller.neuron_counts
                 })
 
-        if self.args.quick_viz:
-            gui = TennlabGUI(x=0, y=0, h=0, w=300)
-        else:
-            gui = TennlabGUI(x=0, y=0, h=0, w=300)
-        gui.position = "sidebar_right"
-        if self.viz is False or self.noviz:
-            gui = False
+            if not self.show_gui:
+                # NOTE: Manually attach things...
+                self.gui.set_world(world)
+                self.gui.set_screen(screen)
+
+            if isinstance(self.gui, VizTrailTennGUI):
+                self.gui.trails.draw(screen, world)
+
 
         world_subscriber = WorldSubscriber(func=callback)
 
-        simargs = dict(
-            world_config=config,
-            subscribers=[world_subscriber],
-            gui=gui,
-            show_gui=bool(gui),
-            start_paused=self.start_paused,
-        )
+        gui = self.gui if self.show_gui else False
+        simargs = {
+            "world_config": config,
+            "subscribers": [world_subscriber],
+            "gui": gui,
+            "show_gui": bool(gui),
+            "start_paused": self.start_paused,
+        }
 
         # allow for callback to modify config
         if (callable(init_callback)
@@ -289,6 +299,25 @@ def run(app, args):
         if args.explore:
             app.p.explore()
 
+    # Save final world state to output
+    if args.viz_trails:
+        # NOTE: Manually initialize font in headless mode
+        pygame.font.init()
+        out_path = "outpng_final.png"
+        out_w, out_h = (800, 600)
+
+        surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
+        surface.fill("#000000")
+        # gui = VizTrailTennGUI(trails=app.trails, x=0, y=0, w=out_w, h=out_h)
+        # gui.set_world(world)
+        # gui.draw(surface, True)
+
+        app.gui.set_time(world.total_steps)
+        app.gui.draw(surface, draw_world=True)
+        pygame.image.save(surface, out_path)
+        print(f"Saved final image at {out_path}")
+
+
     return fitness
 
 
@@ -365,6 +394,8 @@ def get_parsers(parser, subpar):
                            help="pass this to enable sensor vs. output plotting.")
     sp['run'].add_argument('--log_trajectories', action='store_true',
                            help="pass this to log sensor vs. output to file.")
+    sp['run'].add_argument('--viz_trails', action='store_true',
+                               help="pass this to log sensor vs. output to file.")
     sp['run'].add_argument('--start_paused', action='store_true',
                            help="pass this to pause the simulation at startup. Press Space to unpause.")
     sp['run'].add_argument('--caspian', action='store_true',
