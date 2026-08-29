@@ -301,6 +301,31 @@ def run(app, args):
 
     # Save final world state to output
     if args.viz_trails:
+        def fit_world_to_screen(world, screen):
+            agent_radius = world.population[0].radius
+            positions = np.asarray([a.position for a in world.population])
+
+            # Compute bounding box and center
+            padding = 5 * agent_radius
+            tl = positions.min(axis=0) - agent_radius - padding
+            br = positions.max(axis=0) + agent_radius + padding
+            world_center = (tl + br) / 2.0
+            tight_size = np.maximum(br - tl, 1e-5)  # Avoid div-by-zero
+
+            s_size = np.asarray(screen.get_size(), dtype=float)
+
+            # 1. Correct Zoom: fit AABB directly to viewport pixels
+            ideal_zoom = (s_size / tight_size).min()
+            new_zoom = np.clip(ideal_zoom, 0.1, 100.0)
+
+            # 2. Correct Pan: align world center with screen center
+            screen_center = s_size / 2.0
+            new_pan = screen_center - (world_center * new_zoom)
+
+            world.zoom = new_zoom
+            world.pos = new_pan
+
+
         # NOTE: Manually initialize font in headless mode
         pygame.font.init()
         out_path = "outpng_final.png"
@@ -312,8 +337,10 @@ def run(app, args):
         # gui.set_world(world)
         # gui.draw(surface, True)
 
+        fit_world_to_screen(world, surface)
         app.gui.set_time(world.total_steps)
         app.gui.draw(surface, draw_world=True)
+        
         pygame.image.save(surface, out_path)
         print(f"Saved final image at {out_path}")
 
@@ -417,6 +444,7 @@ def main(name="connorsim_snn_eons-v01", cls=ConnorMillingExperiment, parser_call
         parser, subpar = parser_callback(parser, subpar)
 
     args = parser.parse_args()
+    print(args)
 
     args.environment = name
     if args.project is None and args.logfile is None:
