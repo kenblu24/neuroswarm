@@ -22,7 +22,7 @@
 #SBATCH --mem={{ mem|default('5G') }}        # Total memory needed per task (units: K,M,G,T)
 
 ## Specify how much time your job needs. (default: see partition above)
-#SBATCH --time=3-00:00  # Total time needed for job: Days-Hours:Minutes
+#SBATCH --time=1-12:00  # Total time needed for job: Days-Hours:Minutes
 
 #SBATCH --cpus-per-task 48
 
