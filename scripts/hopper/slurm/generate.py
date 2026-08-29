@@ -19,32 +19,46 @@ with open(template_path, 'r') as f:
 
 eons_seeds = [2026, 2027, 2028]
 swarm_sizes = [
-    4,
-    5,
+    # 4,
+    # 5,
     6,
-    7,
+    # 7,
     8,
-    9,
+    # 9,
     10,
-    15,
-    20,
-    25,
-    30,
-    35,
-    40,
-    45,
-    50,
+    # 15,
+    # 20,
+    # 25,
+    # 30,
+    # 35,
+    # 40,
+    # 45,
+    # 50,
 ]
 rngstrats = [
     'TS1',
     # 'TSG',
     # 'TSR',
 ]
-bhvr = 'mill'
-behavior = 'Circliness'
+
+shortnames = {
+    'Circliness': 'mill',
+    'Aggregation': 'aggr',
+    'ExplodingDispersion': 'disp',
+    'DelaunayDiffusion': 'diff',
+}
+behaviors = [
+    # 'Circliness',
+    'Aggregation',
+    'ExplodingDispersion',
+    'DelaunayDiffusion',
+]
 
 configs = []
-for swarm_size, eons_seed, rngstrat in product(swarm_sizes, eons_seeds, rngstrats):
+for behavior, swarm_size, eons_seed, rngstrat in product(
+    behaviors, swarm_sizes, eons_seeds, rngstrats
+):
+    bhvr = shortnames[behavior]
     projname = f"{bhvr}-es{eons_seed}-{rngstrat}-n{swarm_size}"
     configs.append(dict(
         eons_seed=eons_seed,
