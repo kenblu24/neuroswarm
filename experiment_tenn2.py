@@ -101,7 +101,7 @@ class ConnorMillingExperiment(TennExperiment):
         controller_config = agent_config['controller']
         controller_config['neuro_track_all'] = self.viz
         controller_config['network'] = network
-        if self.agents is not None:
+        if self.agents is not None and 'n' not in kwargs:
             config.spawners[0]['n'] = self.agents
 
         def callback(world, screen):
@@ -170,14 +170,14 @@ class ConnorMillingExperiment(TennExperiment):
         return metric.average if getattr(metric, 'default_aggregation', None) == 'average' else metric.value
 
     @override
-    def fitness(self, processor, network, eons_i=None, init_callback=None, return_multi=False, agg=sum,):
+    def fitness(self, processor, network, eons_i=None, init_callback=None, return_multi=False, agg=sum, **kwargs):
         config_seed = cfg.seed if hasattr((cfg := self.fetch_world_config()), 'seed') and self.args.rngstrat != 'TR' else None
         eons_i = None if self.args.rngstrat != 'TG' else eons_i
         base_seed = None if config_seed is None else config_seed + (eons_i or 0)
         if self.args.trials:  # multiple trials/simulations/fitnesses
             # in this case, seed_mod is the eons generation
             seeds = np.random.default_rng(base_seed).integers(0, 2**32, size=self.args.trials)
-            worlds = [self.simulate(processor, network, seed=seed)
+            worlds = [self.simulate(processor, network, seed=seed, **kwargs)
                       for seed in seeds]
             if return_multi:
                 metrics = [self.pick_metric(world, self.args.behavior) for world in worlds]
@@ -185,7 +185,7 @@ class ConnorMillingExperiment(TennExperiment):
                 return worlds, metrics, fitnesses
             return agg([self.extract_fitness(world, self.args.behavior) for world in worlds])
         else:  # single simulation
-            world_final_state = self.simulate(processor, network, seed=base_seed)
+            world_final_state = self.simulate(processor, network, seed=base_seed, **kwargs)
             if return_multi:
                 metric = self.pick_metric(world_final_state, self.args.behavior)
                 return world_final_state, metric, self.extract_fitness(world_final_state, metric)
