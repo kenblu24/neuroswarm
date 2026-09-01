@@ -1,20 +1,17 @@
-from io import BytesIO
 import os
-import numpy as np
 from functools import partial
-# import matplotlib.pyplot as plt
+from io import BytesIO
 
-# import caspian
 
-from tqdm.contrib.concurrent import process_map
+import numpy as np
+import pygame
 from tqdm import tqdm
 
-# Provided Python utilities from tennlab framework/examples/common
-from common.experiment import TennExperiment, caststring
-import common.experiment
-from common import env_tools as envt
+# import matplotlib.pyplot as plt
+# import caspian
+from tqdm.contrib.concurrent import process_map
 
-from rss.gui import TennlabGUI
+import common.experiment
 import rss.graphing as graphing
 
 # typing:
@@ -23,6 +20,10 @@ from swarmsim.world.RectangularWorld import RectangularWorld
 from swarmsim.metrics.metric import Metric
 
 from common.argparse import ArgumentError
+
+# Provided Python utilities from tennlab framework/examples/common
+from common.experiment import TennExperiment, caststring
+from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI
 
 
 class ConnorMillingExperiment(TennExperiment):
@@ -41,6 +42,14 @@ class ConnorMillingExperiment(TennExperiment):
         self.use_caspian = getattr(args, 'caspian', True)
         self.jinja_vars = {}
         self.process_jinja_vars()
+
+        # self.trails = VizTrail(window=None) if self.args.viz_trails else None
+        self.show_gui = True
+        if self.viz is False or self.noviz:
+            self.show_gui = False
+
+        self.gui = VizTrailTennGUI(x=0, y=0, h=0, w=300) if self.args.viz_trails else TennlabGUI(x=0, y=0, h=0, w=300)
+        self.gui.position = "sidebar_right"
 
         if self.agents is None and self.args.action != 'train':
             try:
@@ -112,13 +121,18 @@ class ConnorMillingExperiment(TennExperiment):
                     "Event Counts": a.controller.neuron_counts
                 })
 
-        gui = TennlabGUI(x=0, y=0, h=0, w=300)
-        gui.position = "sidebar_right"
-        if self.viz is False or self.noviz:
-            gui = False
+            if not self.show_gui:
+                # NOTE: Manually attach things...
+                self.gui.set_world(world)
+                self.gui.set_screen(screen)
+
+            if isinstance(self.gui, VizTrailTennGUI):
+                self.gui.trails.draw(screen, world)
+
 
         world_subscriber = WorldSubscriber(func=callback)
 
+        gui = self.gui if self.show_gui else False
         simargs = dict(
             world_config=config,
             subscribers=[world_subscriber],
@@ -286,6 +300,52 @@ def run(app, args):
         if args.explore:
             app.p.explore()
 
+    # Save final world state to output
+    if args.viz_trails:
+        def fit_world_to_screen(world, screen):
+            agent_radius = world.population[0].radius
+            positions = np.asarray([a.position for a in world.population])
+
+            # Compute bounding box and center
+            padding = 5 * agent_radius
+            tl = positions.min(axis=0) - agent_radius - padding
+            br = positions.max(axis=0) + agent_radius + padding
+            world_center = (tl + br) / 2.0
+            tight_size = np.maximum(br - tl, 1e-5)  # Avoid div-by-zero
+
+            s_size = np.asarray(screen.get_size(), dtype=float)
+
+            # 1. Correct Zoom: fit AABB directly to viewport pixels
+            ideal_zoom = (s_size / tight_size).min()
+            new_zoom = np.clip(ideal_zoom, 0.1, 100.0)
+
+            # 2. Correct Pan: align world center with screen center
+            screen_center = s_size / 2.0
+            new_pan = screen_center - (world_center * new_zoom)
+
+            world.zoom = new_zoom
+            world.pos = new_pan
+
+
+        # NOTE: Manually initialize font in headless mode
+        pygame.font.init()
+        out_path = "outpng_final.png"
+        out_w, out_h = (800, 600)
+
+        surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
+        surface.fill("#000000")
+        # gui = VizTrailTennGUI(trails=app.trails, x=0, y=0, w=out_w, h=out_h)
+        # gui.set_world(world)
+        # gui.draw(surface, True)
+
+        fit_world_to_screen(world, surface)
+        app.gui.set_time(world.total_steps)
+        app.gui.draw(surface, draw_world=True)
+
+        pygame.image.save(surface, out_path)
+        print(f"Saved final image at {out_path}")
+
+
     return fitness
 
 
@@ -362,6 +422,8 @@ def get_parsers(parser, subpar):
                            help="pass this to enable sensor vs. output plotting.")
     sp['run'].add_argument('--log_trajectories', action='store_true',
                            help="pass this to log sensor vs. output to file.")
+    sp['run'].add_argument('--viz_trails', action='store_true',
+                               help="pass this to log sensor vs. output to file.")
     sp['run'].add_argument('--start_paused', action='store_true',
                            help="pass this to pause the simulation at startup. Press Space to unpause.")
     sp['run'].add_argument('--caspian', action='store_true',
