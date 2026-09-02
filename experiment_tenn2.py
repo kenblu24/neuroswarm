@@ -2,7 +2,7 @@ import os
 from functools import partial
 from io import BytesIO
 
-
+import re
 import numpy as np
 import pygame
 from tqdm import tqdm
@@ -23,7 +23,7 @@ from common.argparse import ArgumentError
 
 # Provided Python utilities from tennlab framework/examples/common
 from common.experiment import TennExperiment, caststring
-from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI
+from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
 
 
 class ConnorMillingExperiment(TennExperiment):
@@ -37,7 +37,7 @@ class ConnorMillingExperiment(TennExperiment):
         self.world_yaml = args.world_yaml
         self.run_info = None
 
-        self.track_history = args.track_history or args.log_trajectories
+        self.track_history = args.track_history or args.log_trajectories or args.viz_trails
         self.log_trajectories = args.log_trajectories
         self.use_caspian = getattr(args, 'caspian', True)
         self.jinja_vars = {}
@@ -279,6 +279,7 @@ def run(app: ConnorMillingExperiment, args):
 
     # Run app and print fitness
     world, metric, fitness = app.fitness(proc, net, return_multi=True)
+    world: RectangularWorld
     if args.trials:
         for w, m, f in zip(world, metric, fitness):
             print(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
@@ -289,46 +290,25 @@ def run(app: ConnorMillingExperiment, args):
 
     # Save final world state to output
     if args.viz_trails:
-        def fit_world_to_screen(world, screen):
-            agent_radius = world.population[0].radius
-            positions = np.asarray([a.position for a in world.population])
-
-            # Compute bounding box and center
-            padding = 5 * agent_radius
-            tl = positions.min(axis=0) - agent_radius - padding
-            br = positions.max(axis=0) + agent_radius + padding
-            world_center = (tl + br) / 2.0
-            tight_size = np.maximum(br - tl, 1e-5)  # Avoid div-by-zero
-
-            s_size = np.asarray(screen.get_size(), dtype=float)
-
-            # 1. Correct Zoom: fit AABB directly to viewport pixels
-            ideal_zoom = (s_size / tight_size).min()
-            new_zoom = np.clip(ideal_zoom, 0.1, 100.0)
-
-            # 2. Correct Pan: align world center with screen center
-            screen_center = s_size / 2.0
-            new_pan = screen_center - (world_center * new_zoom)
-
-            world.zoom = new_zoom
-            world.pos = new_pan
-
 
         # NOTE: Manually initialize font in headless mode
         pygame.font.init()
-        out_path = "outpng_final.png"
-        out_w, out_h = (800, 600)
+        ma = re.match(r'(?P<w>\d+)x(?P<h>\d+)', args.viz_trails)
+        if ma is None:
+            msg = f"Invalid value for --viz_trails: {args.viz_trails}"
+            raise ValueError(msg)
+        ma = ma.groupdict()
+        out_w, out_h = int(ma['w']), int(ma['h'])
 
         surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
-        surface.fill("#000000")
-        # gui = VizTrailTennGUI(trails=app.trails, x=0, y=0, w=out_w, h=out_h)
-        # gui.set_world(world)
-        # gui.draw(surface, True)
 
-        fit_world_to_screen(world, surface)
+        vectors = app.gui.trails.population_vectors(world.population)
         app.gui.set_time(world.total_steps)
-        app.gui.draw(surface, draw_world=True)
+        offset = app.gui.trails.zoom_fit_to_screen(surface, vectors[:, :, :2].reshape(-1, 2))
+        app.gui.trails.draw(surface, world, vectors=vectors, offset=offset)
+        world.draw(surface, offset)
 
+        out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}.png")
         pygame.image.save(surface, out_path)
         print(f"Saved final image at {out_path}")
 
@@ -424,7 +404,7 @@ def get_parsers(parser, subpar):
                            help="pass this to enable sensor vs. output plotting.")
     sp['run'].add_argument('--log_trajectories', action='store_true',
                            help="pass this to log sensor vs. output to file.")
-    sp['run'].add_argument('--viz_trails', action='store_true',
+    sp['run'].add_argument('--viz_trails', nargs='?', action=EmptyAction, empty_default='800x800',
                                help="pass this to log sensor vs. output to file.")
     sp['run'].add_argument('--start_paused', action='store_true',
                            help="pass this to pause the simulation at startup. Press Space to unpause.")

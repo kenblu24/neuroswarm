@@ -6,8 +6,10 @@ from typing import override
 
 import numpy as np
 import pygame
+import argparse
 from numpy.typing import NDArray
 from swarmsim.agent.MazeAgent import MazeAgent
+from swarmsim.util.collider.AABB import AABB
 from swarmsim.gui.agentGUI import DifferentialDriveGUI
 
 from rss.graphing import extract_history, hr, label_vwx, plot_single_artists
@@ -199,50 +201,104 @@ class VizTrailTennGUI(DifferentialDriveGUI):
 
 
 class VizTrail:
-    def __init__(self, interval: int = 2, window: int | None = None, opacity=0.5):
+    def __init__(self, interval: int = 2, window: int | None = None, opacity=0.3, radius=1.0,
+                 padding=1, limit=(0.1, 1000.0)):
         assert 0. <= opacity <= 1., "Opacity should be in [0, 1]"
 
-        self.agent_pos: dict[str, list[NDArray]] = {}
-        self.agent_cfg: dict[str, tuple[float, pygame.Surface]] = {}
-
-        self.timesteps = 0
         self.interval = interval
         self.window = window
         self.opacity = opacity
+        self.agent_surfaces = []
+        self.radius = radius
+        self.padding = padding  # world coords
+        self.limit = limit
+        self.old_size = None
 
-    def update(self, world, screen_size):
-        for agent in world.population:
-            if agent.name not in self.agent_pos:
-                self.agent_pos[agent.name] = []
-                self.agent_cfg[agent.name] = agent.radius, pygame.Surface(screen_size, pygame.SRCALPHA)
+    # def population_aabb(population):
+    #     return AABB([a.position for a in population])
 
-            self.agent_pos[agent.name].append((agent.getPosition().copy(), agent.angle))
+    # def history_aabb(vectors):
+    #     vectors = np.asarray(vectors)
+    #     return AABB(vectors[:, :2])
 
-    def draw(self, screen: pygame.Surface, world):
-        if screen is None:
-            # NOTE: screen is not provided in headless mode but tracking the trails is still important
-            # NOTE: assuming a default size of (800, 600)
-            self.update(world, (800, 600))
-            return
+    def zoom_fit_to_screen(self, screen, bb: AABB):
+        # Compute bounding box and center
+        bb = AABB(bb)
+        tl = bb._min - self.padding
+        br = bb._max + self.padding
+        center = (tl + br) / 2.0
+        tight_size = np.maximum(br - tl, 1e-5)  # Avoid div-by-zero
 
-        if self.timesteps % self.interval == 0:
-            self.update(world, screen.get_size())
+        screen_size = np.asarray(screen.get_size(), dtype=float)
 
-        def color_hsla(color: pygame.Color, angle_rad: float, s=0.5, l=0.5):
-            color.hsla = np.rad2deg(angle_rad)%360., s*100., l*100., self.opacity*100.
-        pan, zoom = world.pos, world.zoom
-        surface = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        # determine zoom by choosing the widest dimension of the fitted box
+        ideal_zoom = (screen_size / tight_size).min()
+        new_zoom = np.clip(ideal_zoom, *self.limit)
+
+        # 2. Correct Pan: align world center with screen center
+        screen_center = screen_size / 2
+        new_pan = screen_center - (center * new_zoom)
+        return new_pan, new_zoom
+
+    def vectorize_SE2_history(self, agent):
+        history = agent.history[-self.window:self.interval:] if self.window else agent.history[:-self.interval:]
+        return np.asarray([a[0] for a in history])
+
+    def population_vectors(self, population):
+        return np.asarray([self.vectorize_SE2_history(agent) for agent in population])
+
+    @staticmethod
+    def color_hsla(angle_rad: float, s=0.6, l=0.6, a=1.0, inplace: pygame.Color | None = None):
+        color = pygame.Color('white') if inplace is None else inplace
+        color.hsla = np.rad2deg(angle_rad) % 360., s * 100., l * 100., a * 100.
+        return color
+
+    def draw_surfaces(self, screen: pygame.Surface, vectors, offset=((0, 0), 1.0), world=None):
+        pan, zoom = np.asarray(offset[0]), offset[1]
+        size = screen.get_size()
+        if self.old_size != size or len(self.surfaces) != len(vectors):
+            self.surfaces = [pygame.Surface(size, pygame.SRCALPHA) for _ in vectors]
+            self.old_size = size
+
         color = pygame.Color("white")
-        for name, orientation in self.agent_pos.items():
-            radius, surface = self.agent_cfg[name]
-            surface.fill("#00000000")
-            if self.window is not None:
-                orientation = orientation[-self.window:]
+        if world is not None:
+            radii = np.asarray([a.radius for a in world.population])
+        else:
+            radii = np.ones(len(vectors)) * self.radius
+        for r, surf, history in zip(radii, self.surfaces, vectors):
+            surf.fill("#00000000")
+            for vec in history:
+                if vec.size == 0:
+                    continue
+                pos, heading = vec[:2], vec[2]
+                self.color_hsla(heading, a=self.opacity, inplace=color)
+                pygame.draw.circle(surf, color, (pan + pos * zoom), r * zoom)
 
-            for (pos, heading) in orientation:
-                color_hsla(color, heading)
-                pygame.draw.circle(surface, color, pos * zoom, radius * zoom)
+    def draw(self, screen: pygame.Surface, world, vectors=None, offset=None):
+        if screen is None:
+            return
+        offset = (world.pos, world.zoom) if offset is None else offset
+        pan, zoom = np.asarray(offset[0]), offset[1]
 
-        self.timesteps += 1
-        for _, surface in self.agent_cfg.values():
-            screen.blit(surface, pan)
+        screen.fill("#FFFFFFFF")
+
+        if vectors is None:
+            vectors = self.population_vectors(world.population)
+
+        self.draw_surfaces(screen, vectors, offset=(pan, zoom), world=world)
+        for surf in self.surfaces:  # layer surfaces on top of each other
+            screen.blit(surf)
+        for agent in world.population:  # draw opaque agents
+            color = self.color_hsla(agent.angle, a=1.0)
+            pygame.draw.circle(screen, color, (pan + agent.pos * zoom), agent.radius * zoom)
+
+
+class EmptyAction(argparse.Action):
+    def __init__(self, *args, empty_default=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.empty_default = empty_default
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values in ('', None):
+            values = self.empty_default
+        setattr(namespace, self.dest, values)

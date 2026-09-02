@@ -15,6 +15,7 @@ metrics:
   - type: Circliness
     avg_history_max: 450
   - type: DelaunayDiffusion
+    show: false
     history_size: 450
   - type: Aggregation
     history_size: 450
