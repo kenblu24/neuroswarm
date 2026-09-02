@@ -265,7 +265,7 @@ class ConnorMillingExperiment(TennExperiment):
         return d
 
 
-def run(app, args):
+def run(app: ConnorMillingExperiment, args):
 
     # Set up simulator and network
 
@@ -286,19 +286,6 @@ def run(app, args):
         print(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
     else:
         print(f"Fitness ({metric.name}): {fitness:8.4f}")
-
-    if args.log_trajectories:
-        import matplotlib.pyplot as plt
-        graphing.plot_multiple(world)
-        graphing.plot_fitness(world)
-        graphing.export(world, output_file=app.p.ensure_file_parents("agent_trajectories.xlsx"))
-        if args.explore:
-            app.p.explore()
-        plt.show(block=True)
-        # TODO: handle when no project
-    else:
-        if args.explore:
-            app.p.explore()
 
     # Save final world state to output
     if args.viz_trails:
@@ -345,6 +332,21 @@ def run(app, args):
         pygame.image.save(surface, out_path)
         print(f"Saved final image at {out_path}")
 
+    if args.log_trajectories:
+        import matplotlib.pyplot as plt
+        graphing.plot_multiple(world)
+        graphing.plot_fitness(world)
+        graphing.export(world, output_file=app.p.ensure_file_parents("agent_trajectories.xlsx"))
+        if args.explore:
+            app.p.explore()
+        plt.show(block=True)
+        # TODO: handle when no project
+    else:
+        if args.explore:
+            app.p.explore()
+            print("Project folder opened.")
+            if getattr(app.p, '_tempdir', None):
+                input("Waiting for you to finish exploring, press enter to delete the project folder.")
 
     return fitness
 
