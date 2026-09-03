@@ -14,16 +14,16 @@ from tqdm.contrib.concurrent import process_map
 import common.experiment
 import rss.graphing as graphing
 
-# typing:
-from typing import override
-from swarmsim.world.RectangularWorld import RectangularWorld
-from swarmsim.metrics.metric import Metric
-
-from common.argparse import ArgumentError
-
 # Provided Python utilities from tennlab framework/examples/common
+import common.env_tools as envt
 from common.experiment import TennExperiment, caststring
 from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
+
+# typing:
+from typing import override
+from common.argparse import ArgumentError
+from swarmsim.world.RectangularWorld import RectangularWorld
+from swarmsim.metrics.metric import Metric
 
 
 class ConnorMillingExperiment(TennExperiment):
