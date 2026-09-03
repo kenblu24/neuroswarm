@@ -21,7 +21,7 @@ from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
 
 # typing:
 from typing import override
-from common.argparse import ArgumentError
+from common.argparse import ArgumentError, ArgumentParser, _SubParsersAction
 from swarmsim.world.RectangularWorld import RectangularWorld
 from swarmsim.metrics.metric import Metric
 
@@ -375,7 +375,7 @@ def test(app, args):
         raise ArgumentError(args.positions, "Positions not specified")
 
 
-def get_parsers(parser, subpar):
+def get_parsers(parser, subpar) -> tuple[ArgumentParser, _SubParsersAction]:
     # this is a separate function so we can inherit options from this module
     sp = subpar.parsers
 
@@ -408,7 +408,8 @@ def get_parsers(parser, subpar):
     sp['run'].add_argument('--log_trajectories', action='store_true',
                            help="pass this to log sensor vs. output to file.")
     sp['run'].add_argument('--viz_trails', nargs='?', action=EmptyAction, empty_default='800x800',
-                               help="pass this to log sensor vs. output to file.")
+                               help="Take a screenshot with color trails on the last frame of the simulation."
+                               " May optionally specify a size, e.g. 800x800.")
     sp['run'].add_argument('--start_paused', action='store_true',
                            help="pass this to pause the simulation at startup. Press Space to unpause.")
     sp['run'].add_argument('--caspian', action='store_true',

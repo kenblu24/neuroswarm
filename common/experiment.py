@@ -347,7 +347,7 @@ def run(app, args):
     return fitness
 
 
-def get_parsers(conflict_handler='resolve') -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
+def get_parsers(conflict_handler='resolve') -> tuple[argparse.ArgumentParser, argparse._SubParsersAction]:
     # parse cmd line args and run either `train(...)` or `run(...)`
     HelpDefaults = argparse.ArgumentDefaultsHelpFormatter
     ch = conflict_handler
