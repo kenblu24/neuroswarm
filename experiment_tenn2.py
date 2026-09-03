@@ -265,7 +265,10 @@ class ConnorMillingExperiment(TennExperiment):
         return d
 
 
-def run(app: ConnorMillingExperiment, args):
+def run(app: ConnorMillingExperiment, args, silent=False):
+    def prnt(*args, **kwargs):
+        if not silent:
+            print(*args, **kwargs)
 
     # Set up simulator and network
 
@@ -282,11 +285,11 @@ def run(app: ConnorMillingExperiment, args):
     world: RectangularWorld
     if args.trials:
         for w, m, f in zip(world, metric, fitness):
-            print(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
-        print(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
-        print(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
+            prnt(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
+        prnt(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
+        prnt(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
     else:
-        print(f"Fitness ({metric.name}): {fitness:8.4f}")
+        prnt(f"Fitness ({metric.name}): {fitness:8.4f}")
 
     # Save final world state to output
     if args.viz_trails:
@@ -295,7 +298,7 @@ def run(app: ConnorMillingExperiment, args):
         pygame.font.init()
         ma = re.match(r'(?P<w>\d+)x(?P<h>\d+)', args.viz_trails)
         if ma is None:
-            msg = f"Invalid value for --viz_trails: {args.viz_trails}"
+            msg = f"Invalid value for --viz_trails size: {args.viz_trails}"
             raise ValueError(msg)
         ma = ma.groupdict()
         out_w, out_h = int(ma['w']), int(ma['h'])
@@ -310,7 +313,7 @@ def run(app: ConnorMillingExperiment, args):
 
         out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}.png")
         pygame.image.save(surface, out_path)
-        print(f"Saved final image at {out_path}")
+        prnt(f"Saved final image at {out_path}")
 
     if args.log_trajectories:
         import matplotlib.pyplot as plt
@@ -324,7 +327,7 @@ def run(app: ConnorMillingExperiment, args):
     else:
         if args.explore:
             app.p.explore()
-            print("Project folder opened.")
+            prnt("Project folder opened.")
             if getattr(app.p, '_tempdir', None):
                 input("Waiting for you to finish exploring, press enter to delete the project folder.")
 
