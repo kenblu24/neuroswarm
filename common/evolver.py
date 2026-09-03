@@ -299,7 +299,8 @@ class Evolver:
 
     def as_config_dict(self):
         return {
-            "app": self.app,
+            "app_type": self.app.__class__.__name__,
+            "environment_name": self.app.args.environment,
             "eons_params": self.eons_params,
             "proc_name": self.proc_name,
             "proc_params": self.proc_params,
