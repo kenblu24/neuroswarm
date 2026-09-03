@@ -4,9 +4,9 @@ sensors:
   - type: "BinaryFOVSensor"
     theta: 0.45  # Vision Angle / 2 (Radians)
     distance: 1.0  # meters. previously 2.55
+    detect_only_origins: false
     show: true
-    goal_sensing_range: 1.0
-    wall_sensing_range: 1.0
+    only_show_whiskers: false
     # fn: 0.10  # 0.10
     # fp: 0.05  # 0.05
     bias: 0
@@ -30,8 +30,6 @@ stop_at_goal: false
 #     - 0.1
 #     - 0.1
 #     - 0.06
-body_color:
-  - 255
-  - 0
-  - 0
-body_filled: true
+body_color: [230, 230, 230]
+body_filled: false
+stroke_width: 1.0

@@ -1,28 +1,29 @@
-from io import BytesIO
 import os
-import numpy as np
 from functools import partial
-# import matplotlib.pyplot as plt
+from io import BytesIO
 
-# import caspian
-
-from tqdm.contrib.concurrent import process_map
+import re
+import numpy as np
+import pygame
 from tqdm import tqdm
 
-# Provided Python utilities from tennlab framework/examples/common
-from common.experiment import TennExperiment, caststring
-import common.experiment
-from common import env_tools as envt
+# import matplotlib.pyplot as plt
+# import caspian
+from tqdm.contrib.concurrent import process_map
 
-from rss.gui import TennlabGUI
+import common.experiment
 import rss.graphing as graphing
+
+# Provided Python utilities from tennlab framework/examples/common
+import common.env_tools as envt
+from common.experiment import TennExperiment, caststring
+from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
 
 # typing:
 from typing import override
+from common.argparse import ArgumentError, ArgumentParser, _SubParsersAction
 from swarmsim.world.RectangularWorld import RectangularWorld
 from swarmsim.metrics.metric import Metric
-
-from common.argparse import ArgumentError
 
 
 class ConnorMillingExperiment(TennExperiment):
@@ -36,11 +37,19 @@ class ConnorMillingExperiment(TennExperiment):
         self.world_yaml = args.world_yaml
         self.run_info = None
 
-        self.track_history = args.track_history or args.log_trajectories
+        self.track_history = args.track_history or args.log_trajectories or args.viz_trails
         self.log_trajectories = args.log_trajectories
         self.use_caspian = getattr(args, 'caspian', True)
         self.jinja_vars = {}
         self.process_jinja_vars()
+
+        # self.trails = VizTrail(window=None) if self.args.viz_trails else None
+        self.show_gui = True
+        if self.viz is False or self.noviz:
+            self.show_gui = False
+
+        self.gui = VizTrailTennGUI(x=0, y=0, h=0, w=300) if self.args.viz_trails else TennlabGUI(x=0, y=0, h=0, w=300)
+        self.gui.position = "sidebar_right"
 
         if self.agents is None and self.args.action != 'train':
             try:
@@ -101,7 +110,7 @@ class ConnorMillingExperiment(TennExperiment):
         controller_config = agent_config['controller']
         controller_config['neuro_track_all'] = self.viz
         controller_config['network'] = network
-        if self.agents is not None:
+        if self.agents is not None and 'n' not in kwargs:
             config.spawners[0]['n'] = self.agents
 
         def callback(world, screen):
@@ -112,13 +121,18 @@ class ConnorMillingExperiment(TennExperiment):
                     "Event Counts": a.controller.neuron_counts
                 })
 
-        gui = TennlabGUI(x=0, y=0, h=0, w=300)
-        gui.position = "sidebar_right"
-        if self.viz is False or self.noviz:
-            gui = False
+            if not self.show_gui:
+                # NOTE: Manually attach things...
+                self.gui.set_world(world)
+                self.gui.set_screen(screen)
+
+            if isinstance(self.gui, VizTrailTennGUI):
+                self.gui.trails.draw(screen, world)
+
 
         world_subscriber = WorldSubscriber(func=callback)
 
+        gui = self.gui if self.show_gui else False
         simargs = dict(
             world_config=config,
             subscribers=[world_subscriber],
@@ -170,14 +184,14 @@ class ConnorMillingExperiment(TennExperiment):
         return metric.average if getattr(metric, 'default_aggregation', None) == 'average' else metric.value
 
     @override
-    def fitness(self, processor, network, eons_i=None, init_callback=None, return_multi=False, agg=sum,):
+    def fitness(self, processor, network, eons_i=None, init_callback=None, return_multi=False, agg=sum, **kwargs):
         config_seed = cfg.seed if hasattr((cfg := self.fetch_world_config()), 'seed') and self.args.rngstrat != 'TSR' else None
         eons_i = None if self.args.rngstrat != 'TSG' else eons_i
         base_seed = None if config_seed is None else config_seed + (eons_i or 0)
         if self.args.trials:  # multiple trials/simulations/fitnesses
             # in this case, seed_mod is the eons generation
             seeds = np.random.default_rng(base_seed).integers(0, 2**32, size=self.args.trials)
-            worlds = [self.simulate(processor, network, seed=seed)
+            worlds = [self.simulate(processor, network, seed=seed, **kwargs)
                       for seed in seeds]
             if return_multi:
                 metrics = [self.pick_metric(world, self.args.behavior) for world in worlds]
@@ -185,7 +199,7 @@ class ConnorMillingExperiment(TennExperiment):
                 return worlds, metrics, fitnesses
             return agg([self.extract_fitness(world, self.args.behavior) for world in worlds])
         else:  # single simulation
-            world_final_state = self.simulate(processor, network, seed=base_seed)
+            world_final_state = self.simulate(processor, network, seed=base_seed, **kwargs)
             if return_multi:
                 metric = self.pick_metric(world_final_state, self.args.behavior)
                 return world_final_state, metric, self.extract_fitness(world_final_state, metric)
@@ -251,7 +265,10 @@ class ConnorMillingExperiment(TennExperiment):
         return d
 
 
-def run(app, args):
+def run(app: ConnorMillingExperiment, args, silent=False):
+    def prnt(*args, **kwargs):
+        if not silent:
+            print(*args, **kwargs)
 
     # Set up simulator and network
 
@@ -265,13 +282,38 @@ def run(app, args):
 
     # Run app and print fitness
     world, metric, fitness = app.fitness(proc, net, return_multi=True)
+    world: RectangularWorld
     if args.trials:
         for w, m, f in zip(world, metric, fitness):
-            print(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
-        print(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
-        print(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
+            prnt(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
+        prnt(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
+        prnt(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
     else:
-        print(f"Fitness ({metric.name}): {fitness:8.4f}")
+        prnt(f"Fitness ({metric.name}): {fitness:8.4f}")
+
+    # Save final world state to output
+    if args.viz_trails:
+
+        # NOTE: Manually initialize font in headless mode
+        pygame.font.init()
+        ma = re.match(r'(?P<w>\d+)x(?P<h>\d+)', args.viz_trails)
+        if ma is None:
+            msg = f"Invalid value for --viz_trails size: {args.viz_trails}"
+            raise ValueError(msg)
+        ma = ma.groupdict()
+        out_w, out_h = int(ma['w']), int(ma['h'])
+
+        surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
+
+        vectors = app.gui.trails.population_vectors(world.population)
+        app.gui.set_time(world.total_steps)
+        offset = app.gui.trails.zoom_fit_to_screen(surface, vectors[:, :, :2].reshape(-1, 2))
+        app.gui.trails.draw(surface, world, vectors=vectors, offset=offset)
+        world.draw(surface, offset)
+
+        out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}.png")
+        pygame.image.save(surface, out_path)
+        prnt(f"Saved final image at {out_path}")
 
     if args.log_trajectories:
         import matplotlib.pyplot as plt
@@ -285,6 +327,9 @@ def run(app, args):
     else:
         if args.explore:
             app.p.explore()
+            prnt("Project folder opened.")
+            if getattr(app.p, '_tempdir', None):
+                input("Waiting for you to finish exploring, press enter to delete the project folder.")
 
     return fitness
 
@@ -330,7 +375,7 @@ def test(app, args):
         raise ArgumentError(args.positions, "Positions not specified")
 
 
-def get_parsers(parser, subpar):
+def get_parsers(parser, subpar) -> tuple[ArgumentParser, _SubParsersAction]:
     # this is a separate function so we can inherit options from this module
     sp = subpar.parsers
 
@@ -351,7 +396,7 @@ def get_parsers(parser, subpar):
                          "Example: -j key value -j key2 99")
 
     for key in ('test', 'run'):  # arguments that apply to test/validation and stdin
-        sp[key].add_argument('--rngstrat', choices=['T1', 'TR'],)
+        sp[key].add_argument('--rngstrat', choices=['TS1', 'TSR'],)
         # pass  # sp[key].add_argument()
 
     # Training args
@@ -362,6 +407,9 @@ def get_parsers(parser, subpar):
                            help="pass this to enable sensor vs. output plotting.")
     sp['run'].add_argument('--log_trajectories', action='store_true',
                            help="pass this to log sensor vs. output to file.")
+    sp['run'].add_argument('--viz_trails', nargs='?', action=EmptyAction, empty_default='800x800',
+                               help="Take a screenshot with color trails on the last frame of the simulation."
+                               " May optionally specify a size, e.g. 800x800.")
     sp['run'].add_argument('--start_paused', action='store_true',
                            help="pass this to pause the simulation at startup. Press Space to unpause.")
     sp['run'].add_argument('--caspian', action='store_true',
