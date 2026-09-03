@@ -43,14 +43,6 @@ class ConnorMillingExperiment(TennExperiment):
         self.jinja_vars = {}
         self.process_jinja_vars()
 
-        # self.trails = VizTrail(window=None) if self.args.viz_trails else None
-        self.show_gui = True
-        if self.viz is False or self.noviz:
-            self.show_gui = False
-
-        self.gui = VizTrailTennGUI(x=0, y=0, h=0, w=300) if self.args.viz_trails else TennlabGUI(x=0, y=0, h=0, w=300)
-        self.gui.position = "sidebar_right"
-
         if self.agents is None and self.args.action != 'train':
             try:
                 self.agents = self.p.experiment['agents']
@@ -89,6 +81,12 @@ class ConnorMillingExperiment(TennExperiment):
         from swarmsim.world.RectangularWorld import RectangularWorldConfig
         return RectangularWorldConfig.from_yaml_template(self.world_yaml, **(self.jinja_vars | kwargs))
 
+    def make_gui(self):
+        dims = dict(x=0, y=0, h=0, w=300)
+        gui = VizTrailTennGUI(**dims) if self.args.viz_trails else TennlabGUI(**dims)
+        gui.position = "sidebar_right"
+        return gui
+
     def simulate(self, processor, network, init_callback=None, **kwargs):
         from swarmsim import register_dictlike_type, run_sim
         from swarmsim.world.subscribers.WorldSubscriber import WorldSubscriber as WorldSubscriber
@@ -121,18 +119,14 @@ class ConnorMillingExperiment(TennExperiment):
                     "Event Counts": a.controller.neuron_counts
                 })
 
-            if not self.show_gui:
-                # NOTE: Manually attach things...
-                self.gui.set_world(world)
-                self.gui.set_screen(screen)
+            # if isinstance(self.gui, VizTrailTennGUI):
+            #     self.gui.trails.draw(screen, world)
 
-            if isinstance(self.gui, VizTrailTennGUI):
-                self.gui.trails.draw(screen, world)
-
+        gui = self.viz and not self.noviz
+        gui = self.make_gui() if gui else False
 
         world_subscriber = WorldSubscriber(func=callback)
 
-        gui = self.gui if self.show_gui else False
         simargs = dict(
             world_config=config,
             subscribers=[world_subscriber],
@@ -293,6 +287,9 @@ def run(app: ConnorMillingExperiment, args, silent=False):
 
     # Save final world state to output
     if args.viz_trails:
+        if not world.gui:
+            world.gui = app.make_gui()
+        gui = world.gui
 
         # NOTE: Manually initialize font in headless mode
         pygame.font.init()
@@ -305,10 +302,10 @@ def run(app: ConnorMillingExperiment, args, silent=False):
 
         surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
 
-        vectors = app.gui.trails.population_vectors(world.population)
-        app.gui.set_time(world.total_steps)
-        offset = app.gui.trails.zoom_fit_to_screen(surface, vectors[:, :, :2].reshape(-1, 2))
-        app.gui.trails.draw(surface, world, vectors=vectors, offset=offset)
+        vectors = gui.trails.population_vectors(world.population)
+        gui.set_time(world.total_steps)
+        offset = gui.trails.zoom_fit_to_screen(surface, vectors[:, :, :2].reshape(-1, 2))
+        gui.trails.draw(surface, world, vectors=vectors, offset=offset)
         world.draw(surface, offset)
 
         out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}.png")
