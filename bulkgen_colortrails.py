@@ -40,6 +40,8 @@ cls = t2.ConnorMillingExperiment
 def get_parsers(parser, subpar):
     parser, subpar = t2.get_parsers(parser, subpar)
     sp = subpar.parsers
+    sp['run'].add_argument('-p', '--processes', type=int, default=None,
+                           help="number of threads for concurrent fitness evaluation. Defaults to detected CPU count.")
     sp['run'].add_argument('project', nargs='+',
                            help="Specify globs to projects to generate images for.")
     sp['run'].add_argument('--viz_trails', default='2000x2000',
@@ -72,12 +74,12 @@ def main(args, silent=False):
     args_copies = []
     skipped = 0
     for project in projects:
-        args_copy = copy.deepcopy(args)
         if not project.possibly_valid():
             skipped += 1
             msg = f"Invalid project.\n\t{project.root} \tis not a valid project. Skipping."
             warn(msg, stacklevel=1)
             continue
+        args_copy = copy.deepcopy(args)
         args_copy.project = str(project.root)
         args_copy.root = None
         args_copies.append(args_copy)
