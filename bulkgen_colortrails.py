@@ -16,7 +16,11 @@ All other arguments are passed to the experiment_tenn2.py argument parser.
 Examples:
     python bulkgen_colortrails.py '/mnt/c/Users/kenbl/Desktop/aggr/*/*' --noviz --exclude zip
     python bulkgen_colortrails.py config/241104-121312-connorsim_snn_eons-v01 -p 1
-    python bulkgen_colortrails.py results/mill/* --noviz --viz_trails 400x400
+    python bulkgen_colortrails.py results/mill/* --noviz --viz_trails 400x400 --cycles 2000
+
+Note: If using SLURM `srun`, you should use unbuffered mode:
+    srun -c 64 -t 00:30:00 python -u bulkgen_colortrails.py ...
+or set PYTHONUNBUFFERED=1 in your environment.
 
 """
 import os
@@ -40,14 +44,13 @@ cls = t2.ConnorMillingExperiment
 def get_parsers(parser, subpar):
     parser, subpar = t2.get_parsers(parser, subpar)
     sp = subpar.parsers
-    sp['run'].add_argument('-p', '--processes', type=int, default=None,
-                           help="number of threads for concurrent fitness evaluation. Defaults to detected CPU count.")
     sp['run'].add_argument('project', nargs='+',
                            help="Specify globs to projects to generate images for.")
-    sp['run'].add_argument('--viz_trails', default='2000x2000',
-                           help="Take a screenshot with color trails on the last frame of the simulation."
-                           " May optionally specify a size, e.g. 800x800.")
+    sp['run'].add_argument('-p', '--processes', type=int, default=None,
+                           help="number of threads for concurrent fitness evaluation. Defaults to detected CPU count.")
+    sp['run'].add_argument('--viz_trails', default='2000x2000', help="Specify a size for the screenshot, e.g. 800x800.")
     sp['run'].add_argument('--exclude', help="regex to exclude paths. Applied per discovered path")
+    sp['run'].add_argument('-y', '--force', help="Skip confirmation prompts.", action='store_true')
     return parser, subpar
 
 
@@ -88,7 +91,10 @@ def main(args, silent=False):
     prnt(*[a.project for a in args_copies], sep='\n')
     if skipped:
         prnt(f"WARNING: Skipped {skipped} matches.")
-    input("Press enter to continue, ctrl-c to cancel.")
+    if not args.force:
+        prnt("Press enter to continue, ctrl-c to cancel.")
+        input()  # empty input() for `srun`
+    prnt()
 
     if args.processes == 1 or (args.processes is None and os.cpu_count() == 1):
         prnt(f"Using single thread.")
@@ -99,8 +105,6 @@ def main(args, silent=False):
             prnt(f"Using {os.cpu_count()} detected CPUs/threads.")
         else:
             prnt(f"Using {args.processes} threads.")
-
-        # app handles making seeds based on number of trials from args
         process_map(run_one, args_copies, max_workers=args.processes)
 
 
