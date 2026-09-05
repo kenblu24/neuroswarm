@@ -1,10 +1,10 @@
-import os
-from functools import partial
-from io import BytesIO
-
 import re
-import numpy as np
+import pathlib as pl
+from io import BytesIO
+from functools import partial
+
 import pygame
+import numpy as np
 from tqdm import tqdm
 
 # import matplotlib.pyplot as plt
@@ -25,6 +25,8 @@ from common.argparse import ArgumentError, ArgumentParser, _SubParsersAction
 from swarmsim.world.RectangularWorld import RectangularWorld
 from swarmsim.metrics.metric import Metric
 
+wd = pl.Path(__file__).parent
+
 
 class ConnorMillingExperiment(TennExperiment):
     """Tennbots application for TennLab neuro framework & Connor RobotSwarmSimulator (RSS)
@@ -34,7 +36,7 @@ class ConnorMillingExperiment(TennExperiment):
 
     def __init__(self, args):
         super().__init__(args)
-        self.world_yaml = args.world_yaml
+        self.world_yaml = args.world_yaml if pl.Path(args.world_yaml).is_file() else wd / args.world_yaml
         self.run_info = None
 
         self.track_history = args.track_history or args.log_trajectories or args.viz_trails
