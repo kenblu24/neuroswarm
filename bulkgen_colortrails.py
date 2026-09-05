@@ -16,7 +16,7 @@ All other arguments are passed to the experiment_tenn2.py argument parser.
 Examples:
     python bulkgen_colortrails.py '/mnt/c/Users/kenbl/Desktop/aggr/*/*' --noviz --exclude zip
     python bulkgen_colortrails.py config/241104-121312-connorsim_snn_eons-v01 -p 1
-    python bulkgen_colortrails.py results/mill/* --noviz --viz_trails 400x400 --cycles 2000
+    python bulkgen_colortrails.py results/mill/* --noviz --viz_trails 400x400 --cycles 2000 --caspian
 
 Note: If using SLURM `srun`, you should use unbuffered mode:
     srun -c 64 -t 00:30:00 python -u bulkgen_colortrails.py ...

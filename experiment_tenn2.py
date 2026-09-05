@@ -293,12 +293,13 @@ def run(app: ConnorMillingExperiment, args, silent=False):
 
         # NOTE: Manually initialize font in headless mode
         pygame.font.init()
-        ma = re.match(r'(?P<w>\d+)x(?P<h>\d+)', args.viz_trails)
+        ma = re.match(r'(\d+)x(\d+)(\.\w+)?', args.viz_trails)
         if ma is None:
             msg = f"Invalid value for --viz_trails size: {args.viz_trails}"
             raise ValueError(msg)
-        ma = ma.groupdict()
-        out_w, out_h = int(ma['w']), int(ma['h'])
+        out_w, out_h, ext = ma.groups()
+        out_w, out_h = int(out_w), int(out_h)
+        ext = ext or '.png'
 
         surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
 
@@ -308,7 +309,7 @@ def run(app: ConnorMillingExperiment, args, silent=False):
         gui.trails.draw(surface, world, vectors=vectors, offset=offset)
         world.draw(surface, offset)
 
-        out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}.png")
+        out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}{ext}")
         pygame.image.save(surface, out_path)
         prnt(f"Saved final image at {out_path}")
 
