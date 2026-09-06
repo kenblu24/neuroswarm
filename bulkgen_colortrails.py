@@ -87,7 +87,7 @@ def main(args, silent=False):
         args_copy.root = None
         args_copies.append(args_copy)
 
-    prnt("Will generate images for the following projects:\n")
+    prnt(f"Will generate images for {len(args_copies)} projects:\n")
     prnt(*[a.project for a in args_copies], sep='\n')
     if skipped:
         prnt(f"WARNING: Skipped {skipped} matches.")
