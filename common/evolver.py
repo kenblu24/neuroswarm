@@ -183,7 +183,8 @@ class Evolver:
             f(self, epoch_info, new_best)
 
     def evaluate_population(self, networks):
-        generator = (self.app.fitness(self.sim, network, self.epoch + 1) for network in self.net_callback(networks))
+        generator = (self.app.fitness(self.sim, network, self.epoch, i)
+                     for i, network in enumerate(self.net_callback(networks)))
         if self.tqdm is True:
             return [x for x in tqdm.tqdm(generator, total=len(networks))]
         if self.tqdm:
@@ -314,9 +315,9 @@ class Evolver:
 
 # Helper function for MP Pool mapping
 def mp_fitness(bundle):
-    app, net, proc_name, proc_params, eons_i = bundle
+    app, net, proc_name, proc_params, eons_i, seed = bundle
     sim = proc_name(proc_params)
-    return app.fitness(sim, net, eons_i)
+    return app.fitness(sim, net, eons_i, seed)
 
 
 class MPEvolver(Evolver):
@@ -328,7 +329,8 @@ class MPEvolver(Evolver):
     @override
     def evaluate_population(self, networks):
         c = os.cpu_count() if not self.max_workers else self.max_workers
-        bundles = ((self.app, net, self.proc_name, self.proc_params, self.epoch + 1) for net in networks)
+        bundles = ((self.app, net, self.proc_name, self.proc_params, self.epoch, i)
+                   for i, net in enumerate(networks))
         if self.tqdm is True:
             return process_map(mp_fitness, bundles, total=len(networks),
                                max_workers=c, chunksize=1)

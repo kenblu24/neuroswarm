@@ -16,6 +16,7 @@ import rss.graphing as graphing
 
 # Provided Python utilities from tennlab framework/examples/common
 import common.env_tools as envt
+from common.util import filter_seeds, seedmosh
 from common.experiment import TennExperiment, caststring
 from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
 
@@ -71,6 +72,8 @@ class ConnorMillingExperiment(TennExperiment):
         # self.n_inputs, self.n_outputs, _, _ = self.controller.get_default_encoders()
         if self.args.action == 'train':
             self.n_inputs, self.n_outputs, _, _ = self.bootstrap_controller_encoders()
+
+        self.config_seed = getattr(self.fetch_world_config(), 'seed', None)
 
         self.log(f"initialized {self.__class__.__name__} {self.args.action}")
 
@@ -180,22 +183,27 @@ class ConnorMillingExperiment(TennExperiment):
         return metric.average if getattr(metric, 'default_aggregation', None) == 'average' else metric.value
 
     @override
-    def fitness(self, processor, network, eons_i=None, init_callback=None, return_multi=False, agg=sum, **kwargs):
-        config_seed = cfg.seed if hasattr((cfg := self.fetch_world_config()), 'seed') and self.args.rngstrat != 'TSR' else None
-        eons_i = None if self.args.rngstrat != 'TSG' else eons_i
-        base_seed = None if config_seed is None else config_seed + (eons_i or 0)
+    def fitness(self, processor, network, eons_i=None, index=None, init_callback=None, return_multi=False, agg=sum, **kwargs):
+        seedseq = [self.config_seed]
+        if self.args.rngstrat == 'TSG':
+            seedseq.append(eons_i)
+        if self.args.rngstrat == 'TSR':
+            seedseq.extend((index, eons_i))
+        if isinstance(self.args.rngstrat, int):
+            seedseq = [self.args.rngstrat]
+        seed = filter_seeds(*seedseq)
         if self.args.trials:  # multiple trials/simulations/fitnesses
-            # in this case, seed_mod is the eons generation
-            seeds = np.random.default_rng(base_seed).integers(0, 2**32, size=self.args.trials)
+            seeds = seedmosh(seed, size=self.args.trials)
             worlds = [self.simulate(processor, network, seed=seed, **kwargs)
                       for seed in seeds]
             if return_multi:
                 metrics = [self.pick_metric(world, self.args.behavior) for world in worlds]
                 fitnesses = [self.extract_fitness(world, metric) for world, metric in zip(worlds, metrics)]
                 return worlds, metrics, fitnesses
+            print([w.seed for w in worlds])
             return agg([self.extract_fitness(world, self.args.behavior) for world in worlds])
         else:  # single simulation
-            world_final_state = self.simulate(processor, network, seed=base_seed, **kwargs)
+            world_final_state = self.simulate(processor, network, seed=seed, **kwargs)
             if return_multi:
                 metric = self.pick_metric(world_final_state, self.args.behavior)
                 return world_final_state, metric, self.extract_fitness(world_final_state, metric)
@@ -396,7 +404,7 @@ def get_parsers(parser, subpar) -> tuple[ArgumentParser, _SubParsersAction]:
                          "Example: -j key value -j key2 99")
 
     for key in ('test', 'run'):  # arguments that apply to test/validation and stdin
-        sp[key].add_argument('--rngstrat', choices=['TS1', 'TSR'],)
+        sp[key].add_argument('--rngstrat', type=int)
         # pass  # sp[key].add_argument()
 
     # Training args
