@@ -52,6 +52,7 @@ def get_parsers(parser, subpar):
     sp['test'].add_argument('--trials', type=int, default=100,  # changed default from single
                                 help="number of trials to run. Set to None to run one trial with world.yaml[seed]."
                                 " Values greater than 0 will use the world.yaml[seed] to generate more seeds.")
+    sp['test'].add_argument('--force', help="Skip confirmation prompts.", action='store_true')
     return parser, subpar
 
 
@@ -113,7 +114,8 @@ def test(args, silent=False):
     pd.options.display.max_rows = 200
     pd.options.display.min_rows = 200
     prnt(pd.DataFrame(bundles))
-    input("Press enter to continue, ctrl-c to cancel.")
+    if not args.force:
+        input("Press enter to continue, ctrl-c to cancel.")
 
     if args.processes == 1 or (args.processes is None and os.cpu_count() == 1):
         prnt(f"Using single thread.")
