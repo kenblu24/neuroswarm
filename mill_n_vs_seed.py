@@ -1,7 +1,9 @@
 """Generate data to plot how well an SNN performs across swarm sizes it wasn't trained on."""
 import os
+import re
 import sys
 import copy
+import glob
 import pathlib as pl
 from functools import partial
 from itertools import product
@@ -20,9 +22,23 @@ from common.project import UnzippedProject
 wd = pl.Path(__file__).parent
 cls = t2.ConnorMillingExperiment
 
-desktop = pl.Path('/mnt/c/Users/kenbl/Desktop').expanduser()
+# desktop = pl.Path('/mnt/c/Users/kenbl/Desktop').expanduser()
 
-folder = desktop / '20260820mill' / 'mill'
+# folder = desktop / '20260820mill' / 'mill'
+globs = [
+    # "/mnt/c/Users/kenbl/Desktop/four/mill/*/*",
+    "/scratch/kzhu4/mill/*/*",
+    # "/scratch/kzhu4/aggr/*/*",
+    # "/scratch/kzhu4/disp/*/*",
+    # "/scratch/kzhu4/diff/*/*",
+]
+include = r'mill.*TS1'
+exclude = r'zip|\.7z'
+
+projects = [UnzippedProject(p) for g in globs for p in glob.glob(g)
+            if (exclude is None or not re.search(exclude, p)
+                and (include is None or re.search(include, p)))]
+# print(*[p.root for p in projects], sep='\n')
 
 
 def get_parsers(parser, subpar):
@@ -31,9 +47,9 @@ def get_parsers(parser, subpar):
 
     sp['test'].add_argument('--rng_seed', type=int, default=None,
                                 help="rng seed for the app")
-    sp['test'].add_argument('--Nrange', type=str, default=range(1, 10),
+    sp['test'].add_argument('--Nrange', type=str, default=range(3, 50),
                                 help="range of swarm sizes to test")
-    sp['test'].add_argument('--trials', type=int, default=10,  # changed default from single
+    sp['test'].add_argument('--trials', type=int, default=100,  # changed default from single
                                 help="number of trials to run. Set to None to run one trial with world.yaml[seed]."
                                 " Values greater than 0 will use the world.yaml[seed] to generate more seeds.")
     return parser, subpar
@@ -70,9 +86,9 @@ def test(args, silent=False):
     # proc = None
     # net = None if args.stdin == 'stdin' else app.net
 
-    projects = [UnzippedProject(p)
-                for n in folder.iterdir() if n.is_dir() and 'zip' not in n.name
-                for p in n.iterdir()]
+    # projects = [UnzippedProject(p)
+    #             for n in folder.iterdir() if n.is_dir() and 'zip' not in n.name
+    #             for p in n.iterdir()]
 
     args_copies = []
     for project in projects:
@@ -93,6 +109,9 @@ def test(args, silent=False):
         seeds = [config_seed]
     prnt(seeds)
     bundles = tuple(product(args_copies, ns, seeds))
+    pd.options.display.max_colwidth = 128
+    pd.options.display.max_rows = 200
+    pd.options.display.min_rows = 200
     prnt(pd.DataFrame(bundles))
     input("Press enter to continue, ctrl-c to cancel.")
 
