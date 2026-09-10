@@ -11,6 +11,7 @@ import shutil
 import time
 import csv
 import sys
+import re
 import os
 from swarmsim import yaml
 from . import jsontools as jst
@@ -370,6 +371,8 @@ class Project(FolderlessProject):
         if self.root.is_dir():
             if self.allow_overwrite:
                 s = 'rm'
+            elif 'PROJ_EXIST_OKAY' in os.environ and os.environ['PROJ_EXIST_OKAY'].lower() in ('true', '1'):
+                s = 'y'
             else:
                 s = input(f"Project folder already exists:\n\t{str(self.root)}\n'y' to continue, 'rm' to delete the contents of the folder, anything else to exit. ")  # noqa: E501
             if s.lower() not in ('y', 'yes', 'rm'):
@@ -482,6 +485,24 @@ class Networks:
 
     def any(self):
         return any(self.path.iterdir())
+
+    def get_all(self):
+        files = [path for f in self.path.iterdir()
+                 for path in [pl.Path(f)] if path.is_file() and path.suffix == '.json']
+        gens = {}
+        for f in files:
+            match = re.search(r'e(\d+)-(\d+).json', f.name)
+            if match:
+                gen, popid = int(match.group(1)), int(match.group(2))
+                gens.setdefault(gen, {})[popid] = f
+        return gens
+
+    def __getitem__(self, key):
+        try:
+            gen, popid = key
+        except (TypeError, ValueError):
+            return self.get_all()[key]
+        return self.get_all()[gen][popid]
 
 
 class UnzippedProject(Project):

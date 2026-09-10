@@ -133,7 +133,6 @@ class CasPyanBinaryController(AbstractController):
 
     def get_actions(self, agent) -> tuple[float, float]:
         sensor: BinaryFOVSensor = self.parent.sensors[0]
-        self.parent.set_color_by_id(sensor.detection_id)
 
         try:
             v, omega = self.run_processor(sensor.current_state)

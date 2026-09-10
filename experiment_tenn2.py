@@ -1,13 +1,10 @@
-import os
-from functools import partial
+import re
+import pathlib as pl
 from io import BytesIO
+from functools import partial
 
-# typing:
-from typing import override
-
+import pygame
 import numpy as np
-from swarmsim.metrics.abstractmetric import AbstractMetric
-from swarmsim.world.RectangularWorld import RectangularWorld
 from tqdm import tqdm
 
 # import matplotlib.pyplot as plt
@@ -16,12 +13,20 @@ from tqdm.contrib.concurrent import process_map
 
 import common.experiment
 import rss.graphing as graphing
-from common import env_tools as envt
-from common.argparse import ArgumentError
 
 # Provided Python utilities from tennlab framework/examples/common
-from common.experiment import TennExperiment
-from rss.gui import TennlabGUI
+import common.env_tools as envt
+from common.util import filter_seeds, seedmosh
+from common.experiment import TennExperiment, caststring
+from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
+
+# typing:
+from typing import override
+from common.argparse import ArgumentError, ArgumentParser, _SubParsersAction
+from swarmsim.world.RectangularWorld import RectangularWorld
+from swarmsim.metrics.metric import Metric
+
+wd = pl.Path(__file__).parent
 
 
 class ConnorMillingExperiment(TennExperiment):
@@ -32,10 +37,10 @@ class ConnorMillingExperiment(TennExperiment):
 
     def __init__(self, args):
         super().__init__(args)
-        self.world_yaml = args.world_yaml
+        self.world_yaml = args.world_yaml if pl.Path(args.world_yaml).is_file() else wd / args.world_yaml
         self.run_info = None
 
-        self.track_history = args.track_history or args.log_trajectories
+        self.track_history = args.track_history or args.log_trajectories or args.viz_trails
         self.log_trajectories = args.log_trajectories
         self.use_caspian = getattr(args, 'caspian', True)
         self.jinja_vars = {}
@@ -46,8 +51,6 @@ class ConnorMillingExperiment(TennExperiment):
                 self.agents = self.p.experiment['agents']
             except (KeyError, IndexError, FileNotFoundError, AttributeError):
                 pass
-
-        self.seed_from_yaml()
 
         # register controller type with RSS
         if self.use_caspian:
@@ -70,6 +73,8 @@ class ConnorMillingExperiment(TennExperiment):
         if self.args.action == 'train':
             self.n_inputs, self.n_outputs, _, _ = self.bootstrap_controller_encoders()
 
+        self.config_seed = getattr(self.fetch_world_config(), 'seed', None)
+
         self.log(f"initialized {self.__class__.__name__} {self.args.action}")
 
     def process_jinja_vars(self):
@@ -77,37 +82,19 @@ class ConnorMillingExperiment(TennExperiment):
         self.jinja_vars.update({key: load(value)
                                 for key, value in self.args.jinja_vars})
 
-    def seed_from_yaml(self):
-        if (
-            self.args.trials is None
-            or (seed := self.fetch_world_config().seed) is None
-        ):
-            self.seeds = []
-            return
-        self.seeds = np.random.default_rng(seed).integers(0, 2**32, size=self.args.trials).tolist()
-
-    def fetch_world_config(self):
-        from swarmsim import yaml
+    def fetch_world_config(self, **kwargs):
         from swarmsim.world.RectangularWorld import RectangularWorldConfig
-        if self.args.action != 'train':
-            # try:
-            #     with open(self.p.artifacts / 'env.yaml', 'r') as f:
-            #         d = yaml.load(f)
-            # except FileNotFoundError:
-            #     pass
-            # config = RectangularWorldConfig.from_dict(d)
-            config = RectangularWorldConfig.from_yaml_template(self.world_yaml, **self.jinja_vars)
-        else:
-            config = RectangularWorldConfig.from_yaml_template(self.world_yaml, **self.jinja_vars)
-        return config
+        return RectangularWorldConfig.from_yaml_template(self.world_yaml, **(self.jinja_vars | kwargs))
 
-    def simulate(self, processor, network, init_callback=None):
-        from swarmsim import metrics
-        from swarmsim.config import register_dictlike_type
-        from swarmsim.world.simulate import main as simulator
-        from swarmsim.world.subscribers.WorldSubscriber import (
-            WorldSubscriber as WorldSubscriber,
-        )
+    def make_gui(self):
+        dims = dict(x=0, y=0, h=0, w=300)
+        gui = VizTrailTennGUI(**dims) if self.args.viz_trails else TennlabGUI(**dims)
+        gui.position = "sidebar_right"
+        return gui
+
+    def simulate(self, processor, network, init_callback=None, **kwargs):
+        from swarmsim import register_dictlike_type, run_sim
+        from swarmsim.world.subscribers.WorldSubscriber import WorldSubscriber as WorldSubscriber
 
         # setup network
         network.set_data("processor", self.processor_params)
@@ -118,7 +105,7 @@ class ConnorMillingExperiment(TennExperiment):
         register_dictlike_type('controller', "CaspianMultibitController", self.multibit_controller)
 
         # setup world
-        config = self.fetch_world_config()
+        config = self.fetch_world_config(**kwargs)
         if self.cycles is not None:
             config.stop_at = self.cycles
         agent_config = config.spawners[0]['agent']
@@ -126,7 +113,7 @@ class ConnorMillingExperiment(TennExperiment):
         controller_config = agent_config['controller']
         controller_config['neuro_track_all'] = self.viz
         controller_config['network'] = network
-        if self.agents is not None:
+        if self.agents is not None and 'n' not in kwargs:
             config.spawners[0]['n'] = self.agents
 
         def callback(world, screen):
@@ -137,10 +124,11 @@ class ConnorMillingExperiment(TennExperiment):
                     "Event Counts": a.controller.neuron_counts
                 })
 
-        gui = TennlabGUI(x=0, y=0, h=0, w=300)
-        gui.position = "sidebar_right"
-        if self.viz is False or self.noviz:
-            gui = False
+            # if isinstance(self.gui, VizTrailTennGUI):
+            #     self.gui.trails.draw(screen, world)
+
+        gui = self.viz and not self.noviz
+        gui = self.make_gui() if gui else False
 
         world_subscriber = WorldSubscriber(func=callback)
 
@@ -157,20 +145,22 @@ class ConnorMillingExperiment(TennExperiment):
             or hasattr(self, 'init_callback') and (init_callback := self.init_callback)):
             simargs = init_callback(self, simargs)
 
-        world = simulator(**simargs)  # run simulator
+        world = run_sim(**simargs)  # run simulator
         return world
 
     @staticmethod
     def init_callback(self, simargs):
         return simargs
 
-    def pick_metric(self, world, behavior: int | str | type[AbstractMetric] = 0):
+    def pick_metric(self, world: RectangularWorld,
+                    behavior: int | str | Metric | type[Metric] = 0) -> Metric:
         if behavior in world.metrics:
+            behavior: Metric = behavior
             return behavior
-        if isinstance(behavior, type):
-            behavior = behavior.name
         if isinstance(behavior, int):
             return world.metrics[behavior]
+        if isinstance(behavior, type):
+            behavior = behavior.name
         elif isinstance(behavior, str) and behavior:
             # set metric to the first metric with the given name, or raise an error
             for metric in world.metrics:
@@ -182,31 +172,38 @@ class ConnorMillingExperiment(TennExperiment):
             else:
                 msg = f"Could not find metric '{behavior}' in world metrics"
                 raise IndexError(msg)
-        msg = f"behavior must be int, str, or type[AbstractMetric]. Got {type(behavior)}"
+        msg = f"behavior must be int, str, or type[Metric]. Got {type(behavior)}"
         raise TypeError(msg)
 
-    def extract_fitness(self, world_output: RectangularWorld, behavior: int | str | type[AbstractMetric] = 0):
-        metric: AbstractMetric = self.pick_metric(world_output, behavior)
+    def extract_fitness(self, world_output: RectangularWorld, behavior: int | str | Metric | type[Metric] = 0):
+        metric: Metric = self.pick_metric(world_output, behavior)
         self.run_info = metric.value_history if world_output.metrics else None
         if not world_output.metrics:
-            return 0.0
+            return float('nan')
         return metric.average if getattr(metric, 'default_aggregation', None) == 'average' else metric.value
 
     @override
-    def fitness(self, processor, network, init_callback=None, return_multi=False, agg=sum):
-        if self.seeds:
-            def modify_seed(self, simargs, seed):
-                simargs['world_config'].seed = seed
-                return init_callback(self, simargs) if init_callback else simargs
-            worlds = [self.simulate(processor, network, partial(modify_seed, seed=seed))
-                      for seed in self.seeds]
+    def fitness(self, processor, network, eons_i=None, index=None, init_callback=None, return_multi=False, agg=sum, **kwargs):
+        seedseq = [self.config_seed]
+        if self.args.rngstrat == 'TSG':
+            seedseq.append(eons_i)
+        if self.args.rngstrat == 'TSR':
+            seedseq.extend((index, eons_i))
+        if isinstance(self.args.rngstrat, int):
+            seedseq = [self.args.rngstrat]
+        seed = filter_seeds(*seedseq)
+        if self.args.trials:  # multiple trials/simulations/fitnesses
+            seeds = seedmosh(seed, size=self.args.trials)
+            worlds = [self.simulate(processor, network, seed=seed, **kwargs)
+                      for seed in seeds]
             if return_multi:
                 metrics = [self.pick_metric(world, self.args.behavior) for world in worlds]
                 fitnesses = [self.extract_fitness(world, metric) for world, metric in zip(worlds, metrics)]
                 return worlds, metrics, fitnesses
+            print([w.seed for w in worlds])
             return agg([self.extract_fitness(world, self.args.behavior) for world in worlds])
-        else:
-            world_final_state = self.simulate(processor, network, init_callback)
+        else:  # single simulation
+            world_final_state = self.simulate(processor, network, seed=seed, **kwargs)
             if return_multi:
                 metric = self.pick_metric(world_final_state, self.args.behavior)
                 return world_final_state, metric, self.extract_fitness(world_final_state, metric)
@@ -272,7 +269,10 @@ class ConnorMillingExperiment(TennExperiment):
         return d
 
 
-def run(app, args):
+def run(app: ConnorMillingExperiment, args, silent=False):
+    def prnt(*args, **kwargs):
+        if not silent:
+            print(*args, **kwargs)
 
     # Set up simulator and network
 
@@ -286,13 +286,42 @@ def run(app, args):
 
     # Run app and print fitness
     world, metric, fitness = app.fitness(proc, net, return_multi=True)
-    if app.seeds:
+    world: RectangularWorld
+    if args.trials:
         for w, m, f in zip(world, metric, fitness):
-            print(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
-        print(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
-        print(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
+            prnt(f"Seed {w.seed}\t\tFitness ({m.name}): {f:8.4f}")
+        prnt(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
+        prnt(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
     else:
-        print(f"Fitness ({metric.name}): {fitness:8.4f}")
+        prnt(f"Fitness ({metric.name}): {fitness:8.4f}")
+
+    # Save final world state to output
+    if args.viz_trails:
+        if not world.gui:
+            world.gui = app.make_gui()
+        gui = world.gui
+
+        # NOTE: Manually initialize font in headless mode
+        pygame.font.init()
+        ma = re.match(r'(\d+)x(\d+)(\.\w+)?', args.viz_trails)
+        if ma is None:
+            msg = f"Invalid value for --viz_trails size: {args.viz_trails}"
+            raise ValueError(msg)
+        out_w, out_h, ext = ma.groups()
+        out_w, out_h = int(out_w), int(out_h)
+        ext = ext or '.png'
+
+        surface = pygame.Surface((out_w, out_h), pygame.SRCALPHA)
+
+        vectors = gui.trails.population_vectors(world.population)
+        gui.set_time(world.total_steps)
+        offset = gui.trails.zoom_fit_to_screen(surface, vectors[:, :, :2].reshape(-1, 2))
+        gui.trails.draw(surface, world, vectors=vectors, offset=offset)
+        world.draw(surface, offset)
+
+        out_path = app.p.ensure_file_parents(f"trails_{world.total_steps}{ext}")
+        pygame.image.save(surface, out_path)
+        prnt(f"Saved final image at {out_path}")
 
     if args.log_trajectories:
         import matplotlib.pyplot as plt
@@ -306,6 +335,9 @@ def run(app, args):
     else:
         if args.explore:
             app.p.explore()
+            prnt("Project folder opened.")
+            if getattr(app.p, '_tempdir', None):
+                input("Waiting for you to finish exploring, press enter to delete the project folder.")
 
     return fitness
 
@@ -351,7 +383,7 @@ def test(app, args):
         raise ArgumentError(args.positions, "Positions not specified")
 
 
-def get_parsers(parser, subpar):
+def get_parsers(parser, subpar) -> tuple[ArgumentParser, _SubParsersAction]:
     # this is a separate function so we can inherit options from this module
     sp = subpar.parsers
 
@@ -360,7 +392,8 @@ def get_parsers(parser, subpar):
                          type=int, help="# of agents to run with.",)
         sub.add_argument('--world_yaml', default="rss/turbopi-milling/world.yaml",
                          type=str, help="path to yaml config for sim")
-        sub.add_argument('--behavior', default=0, help="behavior to run. Either int or string matching a behavior name.")
+        sub.add_argument('--behavior', default=0, type=partial(caststring, int),
+                         help="behavior to run. Either int or string matching a behavior name.")
         sub.add_argument('--trials', type=int, default=None,
                          help="number of trials to run. Set to None to run one trial with world.yaml[seed]."
                          " Values greater than 0 will use the world.yaml[seed] to generate more seeds.")
@@ -370,16 +403,21 @@ def get_parsers(parser, subpar):
                          help="Set a variable in the jinja template context. Can be used multiple times. "
                          "Example: -j key value -j key2 99")
 
-    # for key in ('test', 'run'):  # arguments that apply to test/validation and stdin
-    #     pass  # sp[key].add_argument()
+    for key in ('test', 'run'):  # arguments that apply to test/validation and stdin
+        sp[key].add_argument('--rngstrat', type=int)
+        # pass  # sp[key].add_argument()
 
     # Training args
     sp['train'].add_argument('--label', help="[train] label to put into network JSON (key = label).")
+    sp['train'].add_argument('--rngstrat', choices=['TS1', 'TSG', 'TSR'],)
 
     sp['run'].add_argument('--track_history', action='store_true',
                            help="pass this to enable sensor vs. output plotting.")
     sp['run'].add_argument('--log_trajectories', action='store_true',
                            help="pass this to log sensor vs. output to file.")
+    sp['run'].add_argument('--viz_trails', nargs='?', action=EmptyAction, empty_default='800x800',
+                               help="Take a screenshot with color trails on the last frame of the simulation."
+                               " May optionally specify a size, e.g. 800x800.")
     sp['run'].add_argument('--start_paused', action='store_true',
                            help="pass this to pause the simulation at startup. Press Space to unpause.")
     sp['run'].add_argument('--caspian', action='store_true',
@@ -388,7 +426,7 @@ def get_parsers(parser, subpar):
     # Testing args
     sp['test'].add_argument('--positions', default=None,
                              help="file containing agent positions")
-    sp['test'].add_argument('-p', '--processes', type=int, default=1,
+    sp['test'].add_argument('-p', '--processes', type=int, default=None,
                            help="number of threads for concurrent fitness evaluation.")
 
     return parser, subpar
