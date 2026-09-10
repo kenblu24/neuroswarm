@@ -70,8 +70,13 @@ def single_fitness(args, seed):
     assert world_final_state.seed is not None
     metric = app.pick_metric(world_final_state, app.args.behavior)
     rngstrat = app.p.experiment['args']['rngstrat']
+    try:
+        eons_seed = app.p.evolver['eons_params']['seed_eo']
+    except KeyError:
+        eons_seed = app.p.experiment['args']['eons_seed']
     return {
         'train_n': app.agents,
+        'eons_seed': eons_seed,
         'seed': world_final_state.seed,
         'metric': metric.name,
         'rngstrat': rngstrat,
