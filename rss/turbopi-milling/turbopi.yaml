@@ -4,7 +4,7 @@ sensors:
   - type: "BinaryFOVSensor"
     theta: 0.45  # Vision Angle / 2 (Radians)
     distance: 1.0  # meters. previously 2.55
-    detect_only_origins: false
+    detect_only_origins: true
     show: true
     only_show_whiskers: false
     # fn: 0.10  # 0.10

@@ -50,6 +50,7 @@ def get_parsers(parser, subpar):
                            help="number of threads for concurrent fitness evaluation. Defaults to detected CPU count.")
     sp['run'].add_argument('--viz_trails', default='2000x2000', help="Specify a size for the screenshot, e.g. 800x800.")
     sp['run'].add_argument('--exclude', help="regex to exclude paths. Applied per discovered path")
+    sp['run'].add_argument('--include', help="Discovered path(s) must match this regex. Default includes all.")
     sp['run'].add_argument('-y', '--force', help="Skip confirmation prompts.", action='store_true')
     return parser, subpar
 
@@ -72,7 +73,8 @@ def main(args, silent=False):
 
     projects = [UnzippedProject(p)
                 for globstr in args.project for p in glob.glob(globstr)
-                if args.exclude is None or not re.search(args.exclude, p)]
+                if args.exclude is None or not re.search(args.exclude, p)
+                and args.include is None or re.search(args.include, p)]
 
     args_copies = []
     skipped = 0
