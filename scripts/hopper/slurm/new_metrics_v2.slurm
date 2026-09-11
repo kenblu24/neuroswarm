@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Give your job a name to distinguish it from other jobs you run.
-#SBATCH --job-name=snn_new_metrics_02
+#SBATCH --job-name=snn_cont_modes_03
 
 ## General partitions: all-HiPri, bigmem-HiPri   --   (12 hour limit)
 ##                     all-LoPri, bigmem-LoPri, gpuq  (5 days limit)
@@ -18,16 +18,19 @@
 #SBATCH --mail-user=mabayneh@gmu.edu     # Put your GMU email address here
 
 ## Specify how much memory your job needs. (2G is the default)
-#SBATCH --mem=6G        # Total memory needed per task (units: K,M,G,T)
+#SBATCH --mem=8G        # Total memory needed per task (units: K,M,G,T)
 
 ## Specify how much time your job needs. (default: see partition above)
 #SBATCH --time=0-10:00  # Total time needed for job: Days-Hours:Minutes
 
 #SBATCH --cpus-per-task 48
+#SBATCH --array=0-1
+
 
 MAIN_NEURO=$HOME"/neuromorphic/"
-SCRATCH_NEURO=$SCRATCH"/neuromorphic_new_metrics_02/"
+SCRATCH_NEURO=$SCRATCH"/neuromorphic_new_metrics_03-ind"$SLURM_ARRAY_TASK_ID"/"
 TURTWIG_BRANCH="new-metrics"
+RESULTS_DIR="results_ind"$SLURM_ARRAY_TASK_ID
 
 ## Load the relevant modules needed for the job
 module load gnu10
@@ -44,7 +47,7 @@ git clone https://github.com/michabay05/neuroswarm.git turtwig
 # NOTE: just doing 'cd turtwig' backfired because zoxide was trying to be too smart...
 cd ./turtwig
 # Ensure `results` folder exists
-mkdir -p results
+mkdir -p $RESULTS_DIR
 
 git switch -c $TURTWIG_BRANCH "origin/"$TURTWIG_BRANCH
 
@@ -59,16 +62,18 @@ source $MAIN_NEURO"framework/pyframework/bin/activate"
 pwd
 
 export MAKE_PARENTS=true
+BEHAVIORS=("MovingMass" "Boids")
 
 ## Run your program or script
 python experiment_tenn2.py train \
-    --root results \
+    --root $RESULTS_DIR \
     -p 48 \
-    --save_all \
+    -j cm $SLURM_ARRAY_TASK_ID \
+    --save_best \
     --epochs 500 \
     --eons_seed 20 \
-    -N 6 \
-    --pname_suffix moving_mass_es20_n6_trial10 \
-    --world rss/turbopi-milling/world.yaml \
-    --behavior MovingMass \
+    -N 8 \
+    --pname_suffix newmet03_es20_n6_trial10 \
+    --world rss/metrics-test/world.yaml \
+    --behavior ${BEHAVIORS[SLURM_ARRAY_TASK_ID]} \
     --trial 10

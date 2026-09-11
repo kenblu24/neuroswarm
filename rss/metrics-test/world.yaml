@@ -1,0 +1,30 @@
+---
+type: "RectangularWorld"
+size:  # in meters
+  - 8
+  - 8
+time_step: !np 1 / 40  # 0.025 seconds
+seed: <{ seed|default(2023) }>
+spawners:
+  - type: UniformAgentSpawner
+    n: 8  # default number of agents BUT may be overridden by user args
+    facing: away
+    region: [[3.4, 3.4], [3.4, 4.6], [4.6, 4.6], [4.6, 3.4]]
+    agent: !include turbopi.yaml
+metrics:
+  - type: MovingMass
+  - type: Boids
+    separation_metric:
+      linear: [[0, 0.3, 0.6], [-1, 0, 1]]
+      clamp: [-1, 1]
+    cohesion_metric:
+      linear: [[1.2, 1.5, 1.8], [1, 0, -1]]
+      clamp: [-1, 1]
+    alignment_metric:
+      pre_exponent: 1
+      post_exponent: 2
+
+metadata:
+  hash: _hash
+stop_at: 1000 # Upper Simulation Limit (timesteps)
+
