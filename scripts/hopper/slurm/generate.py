@@ -19,7 +19,19 @@ scratch = pl.Path(f"/scratch/{getpass.getuser()}")
 with open(template_path, 'r') as f:
     template = env.from_string(f.read())
 
-eons_seeds = [2026, 2027, 2028]
+eons_seeds = [
+    2026,
+    2027,
+    2028,
+    2029,
+    2030,
+    2031,
+    2032,
+    2033,
+    2034,
+    2035,
+    2036,
+]
 swarm_sizes = [
     4,
     5,
@@ -54,23 +66,33 @@ behaviors = [
     'ExplodingDispersion',
     'DelaunayDiffusion',
 ]
+controller_modes = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+]
 
 # ask the user to choose parameters
-behaviors, swarm_sizes, eons_seeds, rngstrats = RunParametrizer({
+behaviors, swarm_sizes, eons_seeds, rngstrats, controller_modes = RunParametrizer({
     'Behavior': behaviors,
     'Number of Agents': swarm_sizes,
     'EONS Seed': eons_seeds,
     'RNG Strategy': rngstrats,
+    'Controller Tie Mode': controller_modes,
 }).run().values()
 # TODO: persisting old parameter selections to file
 # TODO: pasting parameter lists from clipboard. need to check types.
 
 configs = []
-for behavior, swarm_size, eons_seed, rngstrat in product(
-    behaviors, swarm_sizes, eons_seeds, rngstrats
+for behavior, swarm_size, eons_seed, rngstrat, cm in product(
+    behaviors, swarm_sizes, eons_seeds, rngstrats, controller_modes
 ):
     bhvr = shortnames[behavior]
-    projname = f"{bhvr}-es{eons_seed}-{rngstrat}-n{swarm_size}"
+    projname = f"{bhvr}-es{eons_seed}-{rngstrat}-n{swarm_size}-cm{cm}"
     configs.append(dict(
         eons_seed=eons_seed,
         N=swarm_size,
@@ -80,6 +102,7 @@ for behavior, swarm_size, eons_seed, rngstrat in product(
         jobname=projname,
         projpath=scratch / f'{bhvr}/{swarm_size}' / projname,
         rngstrat=rngstrat,
+        cm=cm,
     ))
 
 # TODO: textual app to examine generated slurm files, modify slurm parameters like time
