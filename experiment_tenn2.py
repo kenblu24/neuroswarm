@@ -24,7 +24,7 @@ from rss.gui import TennlabGUI, VizTrail, VizTrailTennGUI, EmptyAction
 from typing import override
 from common.argparse import ArgumentError, ArgumentParser, _SubParsersAction
 from swarmsim.world.RectangularWorld import RectangularWorld
-from swarmsim.metrics.metric import Metric
+from swarmsim.metrics import Metric
 
 wd = pl.Path(__file__).parent
 

@@ -23,21 +23,22 @@ wd = pl.Path(__file__).parent
 cls = t2.ConnorMillingExperiment
 
 # desktop = pl.Path('/mnt/c/Users/kenbl/Desktop').expanduser()
+default_save_path = wd / "results/mill_n_vs_seed.csv"
 
-# folder = desktop / '20260820mill' / 'mill'
-globs = [
-    # "/mnt/c/Users/kenbl/Desktop/four/mill/*/*",
-    "/scratch/kzhu4/mill/*/*",
-    # "/scratch/kzhu4/aggr/*/*",
-    # "/scratch/kzhu4/disp/*/*",
-    # "/scratch/kzhu4/diff/*/*",
-]
-include = r'mill.*TS1'
-exclude = r'zip|\.7z'
+# # folder = desktop / '20260820mill' / 'mill'
+# globs = [
+#     # "/mnt/c/Users/kenbl/Desktop/four/mill/*/*",
+#     "/scratch/kzhu4/mill/*/*",
+#     # "/scratch/kzhu4/aggr/*/*",
+#     # "/scratch/kzhu4/disp/*/*",
+#     # "/scratch/kzhu4/diff/*/*",
+# ]
+# include = r'mill.*TS1'
+# exclude = r'zip|\.7z'
 
-projects = [UnzippedProject(p) for g in globs for p in glob.glob(g)
-            if (exclude is None or not re.search(exclude, p)
-                and (include is None or re.search(include, p)))]
+# projects = [UnzippedProject(p) for g in globs for p in glob.glob(g)
+#             if (exclude is None or not re.search(exclude, p)
+#                 and (include is None or re.search(include, p)))]
 # print(*[p.root for p in projects], sep='\n')
 
 
@@ -45,6 +46,8 @@ def get_parsers(parser, subpar):
     parser, subpar = t2.get_parsers(parser, subpar)
     sp = subpar.parsers
 
+    sp['test'].add_argument('project', nargs='+',
+                           help="Specify globs to projects to generate images for.")
     sp['test'].add_argument('--rng_seed', type=int, default=None,
                                 help="rng seed for the app")
     sp['test'].add_argument('--Nrange', type=str, default=range(3, 50),
@@ -52,8 +55,48 @@ def get_parsers(parser, subpar):
     sp['test'].add_argument('--trials', type=int, default=100,  # changed default from single
                                 help="number of trials to run. Set to None to run one trial with world.yaml[seed]."
                                 " Values greater than 0 will use the world.yaml[seed] to generate more seeds.")
+    sp['test'].add_argument('--exclude', help="regex to exclude paths. Applied per discovered path")
+    sp['test'].add_argument('--include', help="Discovered path(s) must match this regex. Default includes all.")
+    sp['test'].add_argument('--perproject', action='store_true',
+                                help="After computing all data, save relevant data and plots into each project.")
     sp['test'].add_argument('--force', help="Skip confirmation prompts.", action='store_true')
     return parser, subpar
+
+
+def plot_boxplot(df: pd.DataFrame, max_fit: float | None = None):
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    train_n = df['train_n'].values[0] if df['train_n'].nunique() == 1 else None
+    metric_name = df['metric'].values[0] if df['metric'].nunique() == 1 else None
+    sns.set_theme(style='whitegrid', palette='pastel', context='paper')
+    if max_fit is not None:
+        plt.axhline(max_fit, color='k', linestyle='--', alpha=0.5)
+    sns.boxplot(df, x='test_n', y='fitness', hue='train_n', legend=False)
+    sns.despine(offset=2, left=True)
+    plt.xlabel('$N_\\mathrm{test}$')
+    plt.ylabel('Fitness' + f' ({metric_name})' if metric_name else '')
+    if train_n:
+        plt.title(f'Trained with {train_n} agents')
+    plt.tight_layout()
+    return plt
+
+
+def save_to_project(project: UnzippedProject, data_path: pl.Path):
+    df = pd.read_csv(data_path, index_col=0)
+    df = df[df['path'] == str(project.root)]
+    df.to_csv(project / 'cross_n.csv')
+    try:
+        popfits, _times = project.read_popfit_df_wide()
+    except FileNotFoundError:
+        popfits = None
+    plt = plot_boxplot(df, max_fit=float(popfits.max(axis=None)) if popfits is not None else None)
+    plt.savefig(project / 'cross_n.pdf')
+    plt.close()
+
+
+def save_to_project_mp(bundle):
+    project, data_path = bundle
+    save_to_project(project, data_path)
 
 
 def single_fitness(args, n, seed):
@@ -65,6 +108,7 @@ def single_fitness(args, n, seed):
     assert world_final_state.seed is not None
     metric = app.pick_metric(world_final_state, app.args.behavior)
     return {
+        'path': app.p.root,
         'train_n': app.agents,
         'test_n': n,
         'seed': world_final_state.seed,
@@ -83,31 +127,23 @@ def test(args, silent=False):
         if not silent:
             print(*args, **kwargs)
 
-    # Set up simulator and network
-    # proc = None
-    # net = None if args.stdin == 'stdin' else app.net
-
-    # projects = [UnzippedProject(p)
-    #             for n in folder.iterdir() if n.is_dir() and 'zip' not in n.name
-    #             for p in n.iterdir()]
+    projects = [UnzippedProject(p) for g in args.project for p in glob.glob(g)
+                if (args.exclude is None or not re.search(args.exclude, p))
+                    and (args.include is None or re.search(args.include, p))]
 
     args_copies = []
     for project in projects:
         args_copy = copy.deepcopy(args)
         assert project.possibly_valid()
-        args_copy.project = str(project.root)
+        args_copy.project = project
         args_copy.root = None
         args_copies.append(args_copy)
 
     ns = parse_rangelist(args.Nrange)
-    config_seed = args.rng_seed if args.rng_seed and args.rngstrat != 'TSR' else None
-    if args.trials and config_seed is not None:
-        # if the yaml has null seed, or if --rngstrat TSR
-        seeds = np.random.default_rng(config_seed).integers(0, 2**32, size=args.trials)
-    elif args.trials:
-        seeds = [None] * args.trials
+    if args.trials is not None:
+        seeds = np.random.default_rng(args.rng_seed).integers(0, 2**32, size=args.trials)
     else:
-        seeds = [config_seed]
+        seeds = [args.rng_seed]
     prnt(seeds)
     bundles = tuple(product(args_copies, ns, seeds))
     pd.options.display.max_colwidth = 128
@@ -129,14 +165,21 @@ def test(args, silent=False):
         # app handles making seeds based on number of trials from args
         results = process_map(mp_fitness, bundles, max_workers=args.processes)
 
-        for res in results:
-            prnt(f"{res['test_n']:2d} agents trained with {res['train_n']:2d}\tSeed {res['seed']}"
-                 f"\tFitness ({res['metric']}): {res['fitness']:8.4f}")
+    for res in results:
+        prnt(f"{res['test_n']:2d} agents trained with {res['train_n']:2d}\tSeed {res['seed']}"
+                f"\tFitness ({res['metric']}): {res['fitness']:8.4f}")
 
-        df = pd.DataFrame(results)
-        df.to_csv(wd / "results/test.csv")
-        # print(f"Sum: {sum(fitness):8.4f} \t Avg: {sum(fitness) / len(fitness):8.4f} \t Std: {np.std(fitness):8.4f}")
-        # print(f"Min: {min(fitness):8.4f} \t Max: {max(fitness):8.4f} \t out of {len(fitness)} trials")
+    df = pd.DataFrame(results)
+    df.to_csv(default_save_path)
+    prnt(f"Saved to {default_save_path}")
+    if args.perproject:
+        prnt("Saving plots/data to each project...")
+        bundles = tuple(product(projects, [default_save_path]))
+        if args.processes == 1 or (args.processes is None and os.cpu_count() == 1):
+            for bundle in tqdm.tqdm(bundles):
+                save_to_project(*bundle)
+        else:
+            process_map(save_to_project_mp, bundles, max_workers=args.processes)
 
     return df
 

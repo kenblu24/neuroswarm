@@ -88,7 +88,8 @@ def extract_history(a):
     return t, x, y, theta, sense, v, w
 
 
-def plot_single_artists(a, fig, axs, plot_state=False):
+def plot_single_artists(a, fig, axs, plot_state=False,
+                        start_offset=0, end_offset=None, length=None):
     cr = hr(0.0, 0.9, 0.4)
     cb = hr(0.6, 0.9, 0.4)
     cg = hr(0.3, 0.9, 0.4)
@@ -97,9 +98,19 @@ def plot_single_artists(a, fig, axs, plot_state=False):
     axw = cast(plt.Axes, axs[1])
 
     x, _px, _py, _theta, sense, v, w = extract_history(a)
+    x = x[start_offset:]
+    v = v[start_offset:]
+    w = w[start_offset:]
+    sense = sense[start_offset:]
+    if end_offset is not None or length is not None:
+        length = -end_offset if length is None else length
+        x = x[:length]
+        v = v[:length]
+        w = w[:length]
+        sense = sense[:length]
 
     # create green vertical spanning regions for sensors
-    xsen = [1] if sense and sense[0] else []
+    xsen = [x[0]] if sense and sense[0] else []
     xnot = []
     for (xi, si), (xn, sn) in itertools.pairwise(zip(x, sense)):
         if sn > si:
@@ -107,7 +118,7 @@ def plot_single_artists(a, fig, axs, plot_state=False):
         if si > sn:
             xnot.append(xi)
     if sense and sense[-1]:
-        xnot.append(len(sense) - 1)
+        xnot.append(x[-1])
 
     # breakpoint()
     artists = {}
@@ -142,9 +153,12 @@ def plot_multiple(world):
     return fig
 
 
-def label_vwx(*plots, title=""):
+def label_vwx(*plots, title="", columnspacing=2.0):
     for fig, (ax, axw) in reversed(plots):
         # grab fig, axes from the last plot
+        fig: plt.Figure
+        ax: plt.Axes
+        axw: plt.Axes
         try:
             # grab the artists and labels from the primary axis
             handles, labels = ax.get_legend_handles_labels()
@@ -173,11 +187,12 @@ def label_vwx(*plots, title=""):
     if True:
         bbox = {'bbox_to_anchor': (0.5, 0.95)} if title else {}  # only shift the legend downwards if title shown
         legend = fig.legend(handles=handles,
-                            loc='upper center', ncol=3, fancybox=True, shadow=True, **bbox)
+                            loc='upper center', ncol=3, fancybox=True, shadow=True,
+                            columnspacing=columnspacing, **bbox)
         if title:
             fig.suptitle(title)
         top = 0.87 if title else 0.88
-        fig.supxlabel("Time since start (seconds)", ha='center')
+        fig.supxlabel("Timesteps since start", ha='center')
         fig.supylabel("Forward Velocity (m/s)")
         supyrlabel(fig, "Angular Velocity (rad/s)")
         fig.subplots_adjust(top=top, hspace=0.08, right=(1 - fig.subplotpars.left), bottom=0.1)
