@@ -13,7 +13,9 @@ import csv
 import sys
 import re
 import os
+import pandas as pd
 from swarmsim import yaml
+from swarmsim.yaml.mathexpr import safe_eval
 from . import jsontools as jst
 
 # typing
@@ -355,6 +357,9 @@ class Project(FolderlessProject):
             raise RuntimeError("Project has no path.")
         return str(self.root)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}>{self.root} @ {hex(id(self))}"
+
     def load_bestnet(self,
         path_or_jsonstr: None | str | os.PathLike | File | dict = None,
         update_path=True,
@@ -416,7 +421,6 @@ class Project(FolderlessProject):
         self.popfit_file += f"{time.time()}\t{info.i}\t{repr(info.fitnesses)}\n"
 
     def read_popfit(self, error=True):
-        from swarmsim.yaml.mathexpr import safe_eval
         if not self._opened:
             raise RuntimeError("Project is not open.")
         try:
@@ -428,6 +432,22 @@ class Project(FolderlessProject):
             msg += f"because it has no recorded {POPULATION_FITNESS_NAME} file."
             raise FileNotFoundError(msg) from err
         return list(zip(*([safe_eval(x) for x in line] for line in data)))
+
+    def read_popfit_df_wide(self, safe=True):
+        df = pd.read_csv(self.popfit_path, index_col=1, delimiter='\t',
+                 names=('time', 'epoch', 'fitnesses'))
+        df['time'] = df['time'].astype(float)
+        fe = df['fitnesses'].apply(safe_eval if safe else eval)
+        epochs = [pd.Series(fits, name=epoch) for epoch, fits in fe.items()]
+        return pd.concat(epochs, axis=1), df['time']
+
+    def read_popfit_df_long(self, safe=True):
+        df = pd.read_csv(self.popfit_path, delimiter='\t',
+                 names=('time', 'epoch', 'fitnesses'))
+        df['time'] = df['time'].astype(float)
+        df['fitnesses'] = df['fitnesses'].apply(safe_eval if safe else eval)
+        return pd.DataFrame({'epoch': row.epoch, 'time': row.time, 'fitness': fit}
+                        for row in df.itertuples() for fit in row.fitnesses)
 
     def ensure_dir(self, relpath, parents=True, exist_ok=True, **kwargs):
         path = self.root / relpath

@@ -91,6 +91,8 @@ class TennExperiment(Application):
                 path = project.inquire_project(root=args.root)
                 # this could be train or run/test
                 self.p = project.UnzippedProject(path=path, name=path.name)
+            elif isinstance(args.project, project.Project):
+                self.p = args.project
             elif RE_CONTAINS_SEP.search(args.project):  # project name contains a path separator
                 project_name = pathlib.Path(args.project).name
                 if args.root is not DEFAULT_PROJECT_BASEPATH and args.root is not None:
