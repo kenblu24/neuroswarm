@@ -195,7 +195,7 @@ class Evolver:
     def evaluate_validation(self, network):
         return self.app.validation(self.sim, network)
 
-    def fitness_with_penalty(self, fitnesses, networks):
+    def fitness_with_penalty(self, fitnesses, networks) -> Tuple[float, ...] | np.ndarray:
         # get scores from zipped bundles
         # bundle should be list(zip(networks, fitnesses))
         if self.penalty is None:
@@ -225,6 +225,7 @@ class Evolver:
         t_fs = time.time()
         networks = [nn.network for nn in self.pop.networks]
         self.fitness = self.evaluate_population(networks)
+        self.fitness = np.array(self.fitness)
         t_fitness = time.time() - t_fs
 
         # apply penalty function
@@ -264,7 +265,7 @@ class Evolver:
             topscoring_fitness,
             topscore,
             validation,
-            tuple(self.fitness),  # every score in the population
+            self.fitness.tolist(),  # every score in the population
         )
 
         new_best = False
