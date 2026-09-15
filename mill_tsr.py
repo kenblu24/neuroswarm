@@ -114,14 +114,11 @@ def test(args, silent=False):
         args_copy.network = last_networks[0]
         args_copies.append(args_copy)
 
-    config_seed = args.rng_seed if args.rng_seed and args.rngstrat != 'TSR' else None
-    if args.trials and config_seed is not None:
+    if args.trials is not None:
         # if the yaml has null seed, or if --rngstrat TSR
-        seeds = np.random.default_rng(config_seed).integers(0, 2**32, size=args.trials)
-    elif args.trials:
-        seeds = [None] * args.trials
+        seeds = np.random.default_rng(args.rng_seed).integers(0, 2**32, size=args.trials)
     else:
-        seeds = [config_seed]
+        seeds = [args.rng_seed]
     prnt(seeds)
     bundles = tuple(product(args_copies, seeds))
     pd.options.display.max_colwidth = 128
