@@ -377,7 +377,7 @@ def get_parsers(conflict_handler='resolve') -> tuple[argparse.ArgumentParser, ar
                          type=pathlib.Path, default=DEFAULT_PROJECT_BASEPATH)
         # sub.add_argument('--seed', type=int, help="rng seed for the app", default=None)
         sub.add_argument('-N', '--agents', type=int, help="# of agents to run with.", default=10)
-        sub.add_argument('--cycles', type=int, default=None,
+        sub.add_argument('--cycles', default=None,
                          help="time steps to simulate.")
 
     for sub in (sub_test, sub_run):  # arguments that apply to test/validation and stdin
