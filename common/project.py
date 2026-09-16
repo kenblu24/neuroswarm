@@ -609,15 +609,28 @@ if __name__ == "__main__":
     parser.add_argument("filenames", help="path to project directories or zips", nargs="+")
     args = parser.parse_args()
     for filename in args.filenames:
-        with UnzippedProject(filename) as proj:
+        path = pl.Path(filename)
+        # if non-zip file is passed, try checking parent dirs
+        if path.is_file() and not zipfile.is_zipfile(path):
+            for _i in range(3):
+                path = path.parent
+                if Project(path).possibly_valid():
+                    print(f"Found parent project {path}\n\t--> {filename}")
+                    break
+            else:
+                msg = f"Could not find project as parent of {filename}."
+                raise ValueError(msg)
+
+        with UnzippedProject(path) as proj:
             print(f"Name: {proj.name}" '' if proj.root.exists() else " (missing)")
             if hasattr(proj, "original_path"):
                 print(f" -Original root: {proj.original_path.parent}")
             print(f"  logfile: {proj.logfile_path}" + ('' if proj.logfile_path.exists() else " (missing)"))
             print(f"  runinfo: {proj.popfit_path}" + ('' if proj.popfit_path.exists() else " (missing)"))
-            print(f"  bestnet: {proj.bestnet_file.path}" + ('' if proj.bestnet_file.path.exists() else " (missing)"))
             print(f"  networks: {proj.networks.path}" + ('' if proj.networks.path.exists() else " (missing)"))
             print(f"  artifacts: {proj.root / ARTIFACTS_DIR_NAME}" + ('' if (proj.root / ARTIFACTS_DIR_NAME).exists() else " (missing)"))
+            print(f"  bestnet: {proj.bestnet_file.path}" + ('' if proj.bestnet_file.path.exists() else " (missing)"))
             if proj.bestnet_file.path.exists():
                 dest = (proj.original_path.parent / proj.name).with_suffix(".json")
                 shutil.copy(proj.bestnet_file.path, dest)
+                print(f" -> Copied bestnet to {dest}")
