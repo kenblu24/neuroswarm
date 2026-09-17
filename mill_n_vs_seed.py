@@ -132,9 +132,12 @@ def test(args, silent=False):
                     and (args.include is None or re.search(args.include, p))]
 
     args_copies = []
+    print(f"Matched {len(projects)} projects")
     for project in projects:
         args_copy = copy.deepcopy(args)
-        assert project.possibly_valid()
+        if not project.possibly_valid():
+            msg = f"Project {project} is not valid"
+            raise RuntimeError(msg)
         args_copy.project = project
         args_copy.root = None
         args_copies.append(args_copy)
