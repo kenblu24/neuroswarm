@@ -13,13 +13,14 @@ spawners:
     agent: !include turbopi.yaml
 metrics:
   - type: MovingMass
+    weights: [1, 5]
   - type: Boids
     separation_metric:
-      linear: [[0, 0.3, 0.6], [-1, 0, 1]]
-      clamp: [-1, 1]
+      linear: [[0, 0.3], [0, 1]]
+      clamp: [0, 1]
     cohesion_metric:
-      linear: [[1.2, 1.5, 1.8], [1, 0, -1]]
-      clamp: [-1, 1]
+      linear: [[0.65, 0.75, 0.9], [3, 0, -3]]
+      clamp: [-3, 3]
     alignment_metric:
       pre_exponent: 1
       post_exponent: 2
