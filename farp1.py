@@ -8,27 +8,13 @@ from itertools import product
 sys.path.append(str(Path(__file__).resolve().parent.parent / 'turtwig'))
 
 import experiment_tenn2 as t2
+from common.util import parse_rangelist
 import tqdm
 from tqdm.contrib.concurrent import process_map
 import pandas as pd
 
 # typing
 from typing import Sequence
-
-
-def parse_rangelist(s: str | range | Sequence[int]):
-    """parse a comma-separated list of integers or ranges of integers"""
-    if isinstance(s, Sequence) and not isinstance(s, str):
-        return list(s)
-    segments = [seg.lstrip() for seg in s.strip().split(',')]
-    li = []
-    for seg in segments:
-        if '-' in seg:
-            start, end = seg.split('-')
-            li.extend(range(int(start), int(end) + 1))
-        else:
-            li.append(int(seg))
-    return list(dict.fromkeys(li))  # remove duplicates
 
 
 class FARP1Experiment(t2.ConnorMillingExperiment):
@@ -68,7 +54,7 @@ def get_parsers(parser, subpar):
     sp['test'].add_argument('--rng_seed', type=int, default=...,
                                 help="rng seed for the app")
     sp['test'].add_argument('--Nrange', type=str, default=range(1, 10),
-                                help="rng seed for the app")
+                                help="range of swarm sizes to test")
     sp['test'].add_argument('--trials', type=int, default=10,
                                 help="number of trials to run. Set to None to run one trial with world.yaml[seed]."
                                 " Values greater than 0 will use the world.yaml[seed] to generate more seeds.")

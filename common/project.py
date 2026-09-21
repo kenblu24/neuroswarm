@@ -11,8 +11,11 @@ import shutil
 import time
 import csv
 import sys
+import re
 import os
+import pandas as pd
 from swarmsim import yaml
+from swarmsim.yaml.mathexpr import safe_eval
 from . import jsontools as jst
 
 # typing
@@ -354,6 +357,9 @@ class Project(FolderlessProject):
             raise RuntimeError("Project has no path.")
         return str(self.root)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}>{self.root} @ {hex(id(self))}"
+
     def load_bestnet(self,
         path_or_jsonstr: None | str | os.PathLike | File | dict = None,
         update_path=True,
@@ -370,6 +376,8 @@ class Project(FolderlessProject):
         if self.root.is_dir():
             if self.allow_overwrite:
                 s = 'rm'
+            elif 'PROJ_EXIST_OKAY' in os.environ and os.environ['PROJ_EXIST_OKAY'].lower() in ('true', '1'):
+                s = 'y'
             else:
                 s = input(f"Project folder already exists:\n\t{str(self.root)}\n'y' to continue, 'rm' to delete the contents of the folder, anything else to exit. ")  # noqa: E501
             if s.lower() not in ('y', 'yes', 'rm'):
@@ -413,7 +421,6 @@ class Project(FolderlessProject):
         self.popfit_file += f"{time.time()}\t{info.i}\t{repr(info.fitnesses)}\n"
 
     def read_popfit(self, error=True):
-        from swarmsim.yaml.mathexpr import safe_eval
         if not self._opened:
             raise RuntimeError("Project is not open.")
         try:
@@ -425,6 +432,22 @@ class Project(FolderlessProject):
             msg += f"because it has no recorded {POPULATION_FITNESS_NAME} file."
             raise FileNotFoundError(msg) from err
         return list(zip(*([safe_eval(x) for x in line] for line in data)))
+
+    def read_popfit_df_wide(self, safe=True):
+        df = pd.read_csv(self.popfit_path, index_col=1, delimiter='\t',
+                 names=('time', 'epoch', 'fitnesses'))
+        df['time'] = df['time'].astype(float)
+        fe = df['fitnesses'].apply(safe_eval if safe else eval)
+        epochs = [pd.Series(fits, name=epoch) for epoch, fits in fe.items()]
+        return pd.concat(epochs, axis=1), df['time']
+
+    def read_popfit_df_long(self, safe=True):
+        df = pd.read_csv(self.popfit_path, delimiter='\t',
+                 names=('time', 'epoch', 'fitnesses'))
+        df['time'] = df['time'].astype(float)
+        df['fitnesses'] = df['fitnesses'].apply(safe_eval if safe else eval)
+        return pd.DataFrame({'epoch': row.epoch, 'time': row.time, 'fitness': fit}
+                        for row in df.itertuples() for fit in row.fitnesses)
 
     def ensure_dir(self, relpath, parents=True, exist_ok=True, **kwargs):
         path = self.root / relpath
@@ -482,6 +505,24 @@ class Networks:
 
     def any(self):
         return any(self.path.iterdir())
+
+    def get_all(self):
+        files = [path for f in self.path.iterdir()
+                 for path in [pl.Path(f)] if path.is_file() and path.suffix == '.json']
+        gens = {}
+        for f in files:
+            match = re.search(r'e(\d+)-(\d+).json', f.name)
+            if match:
+                gen, popid = int(match.group(1)), int(match.group(2))
+                gens.setdefault(gen, {})[popid] = f
+        return gens
+
+    def __getitem__(self, key):
+        try:
+            gen, popid = key
+        except (TypeError, ValueError):
+            return self.get_all()[key]
+        return self.get_all()[gen][popid]
 
 
 class UnzippedProject(Project):
@@ -568,15 +609,28 @@ if __name__ == "__main__":
     parser.add_argument("filenames", help="path to project directories or zips", nargs="+")
     args = parser.parse_args()
     for filename in args.filenames:
-        with UnzippedProject(filename) as proj:
+        path = pl.Path(filename)
+        # if non-zip file is passed, try checking parent dirs
+        if path.is_file() and not zipfile.is_zipfile(path):
+            for _i in range(3):
+                path = path.parent
+                if Project(path).possibly_valid():
+                    print(f"Found parent project {path}\n\t--> {filename}")
+                    break
+            else:
+                msg = f"Could not find project as parent of {filename}."
+                raise ValueError(msg)
+
+        with UnzippedProject(path) as proj:
             print(f"Name: {proj.name}" '' if proj.root.exists() else " (missing)")
             if hasattr(proj, "original_path"):
                 print(f" -Original root: {proj.original_path.parent}")
             print(f"  logfile: {proj.logfile_path}" + ('' if proj.logfile_path.exists() else " (missing)"))
             print(f"  runinfo: {proj.popfit_path}" + ('' if proj.popfit_path.exists() else " (missing)"))
-            print(f"  bestnet: {proj.bestnet_file.path}" + ('' if proj.bestnet_file.path.exists() else " (missing)"))
             print(f"  networks: {proj.networks.path}" + ('' if proj.networks.path.exists() else " (missing)"))
             print(f"  artifacts: {proj.root / ARTIFACTS_DIR_NAME}" + ('' if (proj.root / ARTIFACTS_DIR_NAME).exists() else " (missing)"))
+            print(f"  bestnet: {proj.bestnet_file.path}" + ('' if proj.bestnet_file.path.exists() else " (missing)"))
             if proj.bestnet_file.path.exists():
                 dest = (proj.original_path.parent / proj.name).with_suffix(".json")
                 shutil.copy(proj.bestnet_file.path, dest)
+                print(f" -> Copied bestnet to {dest}")
