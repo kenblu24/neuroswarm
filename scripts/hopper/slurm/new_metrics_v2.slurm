@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ## Give your job a name to distinguish it from other jobs you run.
-#SBATCH --job-name=snn_new_mets_03
+#SBATCH --job-name=snn_new_mets_04
 
 ## General partitions: all-HiPri, bigmem-HiPri   --   (12 hour limit)
 ##                     all-LoPri, bigmem-LoPri, gpuq  (5 days limit)
@@ -28,7 +28,7 @@
 
 
 MAIN_NEURO=$HOME"/neuromorphic/"
-SCRATCH_NEURO=$SCRATCH"/neuromorphic_new_metrics_03-ind"$SLURM_ARRAY_TASK_ID"/"
+SCRATCH_NEURO=$SCRATCH"/neuromorphic_new_metrics_04-ind"$SLURM_ARRAY_TASK_ID"/"
 TURTWIG_BRANCH="new-metrics"
 RESULTS_DIR="results_ind"$SLURM_ARRAY_TASK_ID
 
@@ -72,7 +72,7 @@ python experiment_tenn2.py train \
     --epochs 500 \
     --eons_seed 20 \
     -N 8 \
-    --pname_suffix newmet03_es20_n6_trial10 \
+    --pname_suffix newmet04_es20_n6_trial10 \
     --world rss/metrics-test/world.yaml \
     --behavior ${BEHAVIORS[SLURM_ARRAY_TASK_ID]} \
     --trial 10
