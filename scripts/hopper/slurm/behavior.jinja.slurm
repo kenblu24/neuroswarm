@@ -16,10 +16,11 @@
 #SBATCH --error={{ projpath }}/%x-%N-%j.err   # Error file`
 
 ## Slurm can send you updates via email
+#SBATCH --mail-user=mabayneh@gmu.edu       # Put your GMU email address here
 #SBATCH --mail-type=BEGIN,END,FAIL         # ALL,NONE,BEGIN,END,FAIL,REQUEUE,..
 
 ## Specify how much memory your job needs. (2G is the default)
-#SBATCH --mem={{ mem|default('6G') }}        # Total memory needed per task (units: K,M,G,T)
+#SBATCH --mem={{ mem|default('8G') }}        # Total memory needed per task (units: K,M,G,T)
 
 ## Specify how much time your job needs. (default: see partition above)
 #SBATCH --time=1-12:00  # Total time needed for job: Days-Hours:Minutes
@@ -35,9 +36,9 @@ export MAKE_PARENTS=true
 export PROJ_EXIST_OKAY=true
 
 ## Run your program or script
-python experiment_tenn2.py train {{ projpath }} -p 48 --save_best --epochs 2000 \
+python experiment_tenn2.py train {{ projpath }} -p 48 --save_best --epochs 1000 \
  --eons_seed {{ eons_seed }} -N {{ N }} --behavior {{ behavior }} --cycles 1500 \
- --rngstrat {{ rngstrat|default('TS1') }} -j cm {{ cm }}
+ --world {{ worldpath }} --rngstrat {{ rngstrat|default('TS1') }} -j cm {{ cm }}
 
 python experiment_tenn2.py run {{ projpath }} --cycles 1500 --viz_trails 2000x2000 --noviz \
 -j cm {{ cm }} --caspian

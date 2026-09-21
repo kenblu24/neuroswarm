@@ -59,12 +59,16 @@ shortnames = {
     'Aggregation': 'aggr',
     'ExplodingDispersion': 'disp',
     'DelaunayDiffusion': 'diff',
+    'MovingMass': 'mvm',
+    'Boids': 'bds',
 }
 behaviors = [
     'Circliness',
     'Aggregation',
     'ExplodingDispersion',
     'DelaunayDiffusion',
+    'MovingMass',
+    'Boids',
 ]
 controller_modes = [
     0,
@@ -100,6 +104,7 @@ for behavior, swarm_size, eons_seed, rngstrat, cm in product(
         behavior=behavior,
         projname=projname,
         jobname=projname,
+        worldpath="rss/metrics-test/world.yaml",
         projpath=scratch / f'{bhvr}/{swarm_size}' / projname,
         rngstrat=rngstrat,
         cm=cm,
