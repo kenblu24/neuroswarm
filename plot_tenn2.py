@@ -1,45 +1,45 @@
-from io import BytesIO
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-import common
+import sys
 import itertools as it
 
+import matplotlib.pyplot as plt
 
 # from rss.gui import TennlabGUI
-import experiment_tenn2
-from experiment_tenn2 import ConnorMillingExperiment
+import experiment_tenn2 as t2
+from common import experiment
 import rss.graphing as graphing
 
 # typing:
 from typing import override
 from swarmsim.world.RectangularWorld import RectangularWorld
 
-from common.argparse import ArgumentError
-from common import experiment
 
-
-def graph_each(world):
+def graph_each(world, start_offset=0, end_offset=None, length=None):
     bundles = []
     for i, agent in enumerate(world.population):
         fig, ax = plt.subplots()
         axw = ax.twinx()
-        bundle = graphing.plot_single_artists(agent, fig, (ax, axw))
+        bundle = graphing.plot_single_artists(agent, fig, (ax, axw),
+                    start_offset=start_offset, end_offset=end_offset, length=length)
         bundles.append(bundle)
-        _h, _l, legend = graphing.label_vwx((fig, (ax, axw)),
-                                            title=f"Agent {i} Sensors vs. Control Inputs")
+        _h, _l, legend = graphing.label_vwx(
+            (fig, (ax, axw)),
+            title=f"Agent {i} Sensors vs. Control Inputs",
+            columnspacing=0.75,
+        )
         bundle[2]['lineplot_sense'][0].set_visible(False)
         ax.relim(visible_only=True)
         ax.margins(y=0.1)
         axw.margins(y=0.2)
         # make it smaller
+        fig.set_figwidth(4.5)
         fig.set_figheight(2)
         fig.subplots_adjust(top=0.70, bottom=0.22)
-        fig.subplots_adjust(left=0.11, right=0.88)
+        fig.subplots_adjust(left=0.17, right=0.80)
         legend.set_bbox_to_anchor((0.5, 0.90))
     return bundles
 
 
-def run(app: ConnorMillingExperiment, args):
+def run(app: t2.ConnorMillingExperiment, args):
 
     # Set up simulator and network
     import pygame
@@ -83,8 +83,9 @@ def run(app: ConnorMillingExperiment, args):
     import matplotlib.pyplot as plt
     # fig = graphing.plot_multiple(world)
     # fig.suptitle('')
+    kwargs = dict(start_offset=args.offset, end_offset=args.offset_end, length=args.length)
     try:
-        for fig, _axs, _artists in graph_each(world):
+        for fig, _axs, _artists in graph_each(world, **kwargs):
             fig.savefig(app.p.ensure_file_parents(f"plots/agent_trajectories_{fig.number}.pdf"))
         graphing.export(world, output_file=app.p.ensure_file_parents("agent_trajectories.xlsx"))
     except ValueError:
@@ -131,7 +132,9 @@ def run(app: ConnorMillingExperiment, args):
     s = legend.legend_handles[-1]  # the last column should be the vertical lines.
     s.set_linewidth(10.0)  # Draw that thicker in the legend   # pyright: ignore[reportAttributeAccessIssue]
     s.set_alpha(0.25)
-    fig.savefig(app.p.ensure_file_parents(f"plots/agent_sensors_{agent.name}.pdf"))
+    fig.savefig(app.p.ensure_file_parents(f"plots/agent_sensors_{agent.name}.pdf"),
+                # backend='pgf',
+    )
 
     if args.explore:
         app.p.explore()
@@ -142,25 +145,17 @@ def run(app: ConnorMillingExperiment, args):
 
 
 def get_parsers(parser, subpar):
+    sp = subpar.parsers['run']
+    sp.add_argument("--offset", type=int, help="Number of steps at the start of the file to skip", default=0)
+    sp.add_argument("--offset_end", type=int, help="Number of steps at the end of the file to ignore",)
+    sp.add_argument("--length", type=int, help="Length of time to graph in steps",)
     return parser, subpar
 
 
-def main():
-    parser, subpar = experiment.get_parsers()
-    parser, subpar = experiment_tenn2.get_parsers(parser, subpar)
-    parser, subpar = get_parsers(parser, subpar)  # modify parser
-
-    args = parser.parse_args()
-
-    args.environment = "connorsim_snn_eons-v01"  # type: ignore[reportAttributeAccessIssue]
-    if args.project is None and args.logfile is None:
-        args.logfile = "tenn2_train.log"
-
-    app = ConnorMillingExperiment(args)
-
-    args.action = "run"
-    run(app, args)
-
-
 if __name__ == "__main__":
-    main()
+    parser, subpar = get_parsers(*t2.get_parsers(*experiment.get_parsers()))
+    thisfile, *argv = sys.argv
+    args = parser.parse_args(['run', *argv])
+    args.environment = 'plot-tenn2'
+    app = t2.ConnorMillingExperiment(args)
+    run(app, args)

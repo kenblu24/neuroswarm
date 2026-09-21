@@ -183,7 +183,8 @@ class Evolver:
             f(self, epoch_info, new_best)
 
     def evaluate_population(self, networks):
-        generator = (self.app.fitness(self.sim, network, self.epoch + 1) for network in self.net_callback(networks))
+        generator = (self.app.fitness(self.sim, network, self.epoch, i)
+                     for i, network in enumerate(self.net_callback(networks)))
         if self.tqdm is True:
             return [x for x in tqdm.tqdm(generator, total=len(networks))]
         if self.tqdm:
@@ -194,7 +195,7 @@ class Evolver:
     def evaluate_validation(self, network):
         return self.app.validation(self.sim, network)
 
-    def fitness_with_penalty(self, fitnesses, networks):
+    def fitness_with_penalty(self, fitnesses, networks) -> Tuple[float, ...] | np.ndarray:
         # get scores from zipped bundles
         # bundle should be list(zip(networks, fitnesses))
         if self.penalty is None:
@@ -224,6 +225,7 @@ class Evolver:
         t_fs = time.time()
         networks = [nn.network for nn in self.pop.networks]
         self.fitness = self.evaluate_population(networks)
+        self.fitness = np.array(self.fitness)
         t_fitness = time.time() - t_fs
 
         # apply penalty function
@@ -263,7 +265,7 @@ class Evolver:
             topscoring_fitness,
             topscore,
             validation,
-            tuple(self.fitness),  # every score in the population
+            self.fitness.tolist(),  # every score in the population
         )
 
         new_best = False
@@ -299,7 +301,8 @@ class Evolver:
 
     def as_config_dict(self):
         return {
-            "app": self.app,
+            "app_type": self.app.__class__.__name__,
+            "environment_name": self.app.args.environment,
             "eons_params": self.eons_params,
             "proc_name": self.proc_name,
             "proc_params": self.proc_params,
@@ -313,9 +316,9 @@ class Evolver:
 
 # Helper function for MP Pool mapping
 def mp_fitness(bundle):
-    app, net, proc_name, proc_params, eons_i = bundle
+    app, net, proc_name, proc_params, eons_i, seed = bundle
     sim = proc_name(proc_params)
-    return app.fitness(sim, net, eons_i)
+    return app.fitness(sim, net, eons_i, seed)
 
 
 class MPEvolver(Evolver):
@@ -327,7 +330,8 @@ class MPEvolver(Evolver):
     @override
     def evaluate_population(self, networks):
         c = os.cpu_count() if not self.max_workers else self.max_workers
-        bundles = ((self.app, net, self.proc_name, self.proc_params, self.epoch + 1) for net in networks)
+        bundles = ((self.app, net, self.proc_name, self.proc_params, self.epoch, i)
+                   for i, net in enumerate(networks))
         if self.tqdm is True:
             return process_map(mp_fitness, bundles, total=len(networks),
                                max_workers=c, chunksize=1)

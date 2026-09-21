@@ -91,9 +91,11 @@ class TennExperiment(Application):
                 path = project.inquire_project(root=args.root)
                 # this could be train or run/test
                 self.p = project.UnzippedProject(path=path, name=path.name)
+            elif isinstance(args.project, project.Project):
+                self.p = args.project
             elif RE_CONTAINS_SEP.search(args.project):  # project name contains a path separator
                 project_name = pathlib.Path(args.project).name
-                if args.root is not DEFAULT_PROJECT_BASEPATH:
+                if args.root is not DEFAULT_PROJECT_BASEPATH and args.root is not None:
                     print("WARNING: You seem to have specified a root path AND a full project path.")
                     print(f"The root path will be ignored; path={args.project}")
                 self.p = project.UnzippedProject(path=args.project, name=project_name)
@@ -347,7 +349,7 @@ def run(app, args):
     return fitness
 
 
-def get_parsers(conflict_handler='resolve'):
+def get_parsers(conflict_handler='resolve') -> tuple[argparse.ArgumentParser, argparse._SubParsersAction]:
     # parse cmd line args and run either `train(...)` or `run(...)`
     HelpDefaults = argparse.ArgumentDefaultsHelpFormatter
     ch = conflict_handler
@@ -375,7 +377,7 @@ def get_parsers(conflict_handler='resolve'):
                          type=pathlib.Path, default=DEFAULT_PROJECT_BASEPATH)
         # sub.add_argument('--seed', type=int, help="rng seed for the app", default=None)
         sub.add_argument('-N', '--agents', type=int, help="# of agents to run with.", default=10)
-        sub.add_argument('--cycles', type=int, default=None,
+        sub.add_argument('--cycles', default=None,
                          help="time steps to simulate.")
 
     for sub in (sub_test, sub_run):  # arguments that apply to test/validation and stdin
@@ -383,7 +385,6 @@ def get_parsers(conflict_handler='resolve'):
         net = sub.add_mutually_exclusive_group(required=False)
         net.add_argument('--network', help="network")
         net.add_argument('--prnet', help="network name in the project folder")
-        sub.add_argument('--viz', help="specify a specific visualizer", default=True)
         sub.add_argument('--noviz', help="explicitly disable viz", action="store_true")
         sub.add_argument('--viz_delay', type=float,  # default: None
                          help="delay between timesteps for viz.")
@@ -399,6 +400,7 @@ def get_parsers(conflict_handler='resolve'):
     # Run-only args
     sub_run.add_argument('--live_netviz', action='store_true',
                          help="Show a visualization of the network in the lua app.")
+    sub_run.add_argument('--viz', help="specify a specific visualizer", default=True)
 
     # Training args
     sub_train.add_argument('--network', default=None,
@@ -431,9 +433,9 @@ def get_parsers(conflict_handler='resolve'):
                            help="override population size")
     sub_train.add_argument('--eons_seed', type=int,
                            help="Seed for EONS. Leave blank for random (time)")
-    sub_train.add_argument('--viz', help="specify a specific visualizer", default=False)
 
     for sub in (sub_train, sub_test):  # applies to both train, test
+        sub.add_argument('--viz', help="specify a specific visualizer", default=False)
         sub.add_argument('--runs', type=int, default=1,
                          help="how many runs are used to calculate fitness for a network.")
 

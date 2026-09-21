@@ -1639,10 +1639,19 @@ class _ActionsContainer(object):
                 confl_optional = self._option_string_actions[option_string]
                 confl_optionals.append((option_string, confl_optional))
 
+        confl_positionals = []
+        if not action.option_strings:
+            confl_positionals.extend([(action.option_strings, a) for a in self._actions
+                                 if not a.option_strings
+                                 and a.dest == action.dest])
+
         # resolve any conflicts
         if confl_optionals:
             conflict_handler = self._get_handler()
             conflict_handler(action, confl_optionals)
+        elif confl_positionals:
+            conflict_handler = self._get_handler()
+            conflict_handler(action, confl_positionals)
 
     def _handle_conflict_error(self, action, conflicting_actions):
         message = ngettext('conflicting option string: %s',
@@ -1656,16 +1665,19 @@ class _ActionsContainer(object):
     def _handle_conflict_resolve(self, action, conflicting_actions):
 
         # remove all conflicting options
-        for option_string, action in conflicting_actions:
+        for option_string, old_action in conflicting_actions:
+            if action.option_strings:  # new action not positional
+                # remove the conflicting option
+                old_action.option_strings.remove(option_string)
+                self._option_string_actions.pop(option_string, None)
 
-            # remove the conflicting option
-            action.option_strings.remove(option_string)
-            self._option_string_actions.pop(option_string, None)
-
-            # if the option now has no option string, remove it from the
-            # container holding it
-            if not action.option_strings:
-                action.container._remove_action(action)
+                # if the option now has no option string, remove it from the
+                # container holding it
+                if not old_action.option_strings:
+                    old_action.container._remove_action(old_action)
+            else:  # positional action
+                if action.dest == old_action.dest:
+                    old_action.container._remove_action(old_action)
 
 
 class _ArgumentGroup(_ActionsContainer):
