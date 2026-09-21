@@ -59,12 +59,16 @@ shortnames = {
     'Aggregation': 'aggr',
     'ExplodingDispersion': 'disp',
     'DelaunayDiffusion': 'diff',
+    'MovingMass': 'mvm',
+    'Boids': 'bds',
 }
 behaviors = [
     'Circliness',
     'Aggregation',
     'ExplodingDispersion',
     'DelaunayDiffusion',
+    'MovingMass',
+    'Boids',
 ]
 controller_modes = [
     0,
