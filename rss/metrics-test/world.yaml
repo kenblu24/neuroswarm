@@ -7,11 +7,20 @@ time_step: !np 1 / 40  # 0.025 seconds
 seed: <{ seed|default(2023) }>
 spawners:
   - type: UniformAgentSpawner
-    n: 8  # default number of agents BUT may be overridden by user args
+    n: <{ n|default(6) }>  # default number of agents BUT may be overridden by user args
     facing: away
     region: [[3.4, 3.4], [3.4, 4.6], [4.6, 4.6], [4.6, 3.4]]
     agent: !include turbopi.yaml
 metrics:
+  - type: Circliness
+    avg_history_max: 450
+  - type: DelaunayDiffusion
+    show: false
+    history_size: 450
+  - type: Aggregation
+    history_size: 450
+  - type: ExplodingDispersion
+    history_size: 450
   - type: MovingMass
     history_size: 450
     linear: [1, 1]
