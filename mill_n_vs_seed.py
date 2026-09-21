@@ -18,6 +18,12 @@ import experiment_tenn2 as t2
 from common.util import parse_rangelist
 from common.project import UnzippedProject
 
+try:
+    from matplotlib.backends.backend_pgf import LatexManager
+    LatexManager()
+    use_pgf = True
+except RuntimeError:
+    use_pgf = False
 
 wd = pl.Path(__file__).parent
 cls = t2.ConnorMillingExperiment
@@ -63,20 +69,21 @@ def get_parsers(parser, subpar):
     return parser, subpar
 
 
-def plot_boxplot(df: pd.DataFrame, max_fit: float | None = None):
+def plot_boxplot(df: pd.DataFrame, max_fit: float | None = None, eons_seed=None):
     import seaborn as sns
     import matplotlib.pyplot as plt
     train_n = df['train_n'].values[0] if df['train_n'].nunique() == 1 else None
     metric_name = df['metric'].values[0] if df['metric'].nunique() == 1 else None
-    sns.set_theme(style='whitegrid', palette='pastel', context='paper')
+    sns.set_theme(style='whitegrid', palette='pastel', context='talk')
     if max_fit is not None:
         plt.axhline(max_fit, color='k', linestyle='--', alpha=0.5)
     sns.boxplot(df, x='test_n', y='fitness', hue='train_n', legend=False)
     sns.despine(offset=2, left=True)
     plt.xlabel('$N_\\mathrm{test}$')
     plt.ylabel('Fitness' + f' ({metric_name})' if metric_name else '')
+    seedmsg = '' if eons_seed is None else f', $\\mathrm{{eons\\_seed}}={eons_seed}$'
     if train_n:
-        plt.title(f'Trained with {train_n} agents')
+        plt.title(f'$N_\\mathrm{{train}}={train_n}$' + seedmsg)
     plt.tight_layout()
     return plt
 
@@ -89,8 +96,11 @@ def save_to_project(project: UnzippedProject, data_path: pl.Path):
         popfits, _times = project.read_popfit_df_wide()
     except FileNotFoundError:
         popfits = None
-    plt = plot_boxplot(df, max_fit=float(popfits.max(axis=None)) if popfits is not None else None)
-    plt.savefig(project / 'cross_n.pdf')
+    es = df['eons_seed']
+    plt = plot_boxplot(df,
+                       max_fit=float(popfits.max(axis=None)) if popfits is not None else None,
+                       eons_seed=es.values[0] if es.nunique() == 1 else None)
+    plt.savefig(project / 'cross_n.pdf', backend='pgf' if use_pgf else None)
     plt.close()
 
 
@@ -107,8 +117,13 @@ def single_fitness(args, n, seed):
     assert app.agents is not None
     assert world_final_state.seed is not None
     metric = app.pick_metric(world_final_state, app.args.behavior)
+    try:
+        eons_seed = app.p.evolver['eons_params']['seed_eo']
+    except KeyError:
+        eons_seed = app.p.experiment['args']['eons_seed']
     return {
         'path': app.p.root,
+        'eons_seed': eons_seed,
         'train_n': app.agents,
         'test_n': n,
         'seed': world_final_state.seed,
