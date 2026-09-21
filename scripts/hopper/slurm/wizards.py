@@ -55,7 +55,7 @@ class ParameterChooser(Widget):
         self.choices = choices
         self.choicetuples = [(str(c), c) for c in choices]
         self.selectionlist = SelectionList(*self.choicetuples)
-        self.selectionlist.select_all()
+        # self.selectionlist.select_all()
 
     def compose(self) -> ComposeResult:
         yield Label(self.label, classes='selection_label')

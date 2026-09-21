@@ -1,9 +1,7 @@
 #!/bin/bash
 
-
-
 ## Give your job a name to distinguish it from other jobs you run.
-#SBATCH --job-name={{ jobname }}
+#SBATCH --job-name=snn_cont_modes_01
 
 ## General partitions: all-HiPri, bigmem-HiPri   --   (12 hour limit)
 ##                     all-LoPri, bigmem-LoPri, gpuq  (5 days limit)
@@ -12,32 +10,42 @@
 
 ## Separate output and error messages into 2 files.`
 ## NOTE: %u=userID, %x=jobName, %N=nodeID, %j=jobID, %A=arrayID, %a=arrayTaskID`
-#SBATCH --output={{ projpath }}/%x-%N-%j.out  # Output file`
-#SBATCH --error={{ projpath }}/%x-%N-%j.err   # Error file`
+#SBATCH --output=/scratch/%u/%x-%N-%j.out  # Output file`
+#SBATCH --error=/scratch/%u/%x-%N-%j.err   # Error file`
 
 ## Slurm can send you updates via email
 #SBATCH --mail-type=BEGIN,END,FAIL         # ALL,NONE,BEGIN,END,FAIL,REQUEUE,..
+#SBATCH --mail-user=mabayneh@gmu.edu     # Put your GMU email address here
 
 ## Specify how much memory your job needs. (2G is the default)
-#SBATCH --mem={{ mem|default('6G') }}        # Total memory needed per task (units: K,M,G,T)
+#SBATCH --mem=4G        # Total memory needed per task (units: K,M,G,T)
 
 ## Specify how much time your job needs. (default: see partition above)
-#SBATCH --time=1-12:00  # Total time needed for job: Days-Hours:Minutes
+#SBATCH --time=0-10:00  # Total time needed for job: Days-Hours:Minutes
 
 #SBATCH --cpus-per-task 48
+#SBATCH --array=0-6
 
 
 ## Load the relevant modules needed for the job
 source ~/neuromorphic/turtwig/scripts/hopper/neuromodules.sh
-cd ~/neuromorphic/turtwig
+mkdir -p mich_results
+cd turtwig
 
 export MAKE_PARENTS=true
-export PROJ_EXIST_OKAY=true
+
+CIRCLINESS_INDEX=0
 
 ## Run your program or script
-python experiment_tenn2.py train {{ projpath }} -p 48 --save_best --epochs 2000 \
- --eons_seed {{ eons_seed }} -N {{ N }} --behavior {{ behavior }} --cycles 1500 \
- --rngstrat {{ rngstrat|default('TS1') }} -j cm {{ cm }}
-
-python experiment_tenn2.py run {{ projpath }} --cycles 1500 --viz_trails 2000x2000 --noviz \
--j cm {{ cm }} --caspian
+python experiment_tenn2.py train \
+    --root mich_results \
+    -p 48 \
+    -j cm $SLURM_ARRAY_TASK_ID \
+    --save_all \
+    --epochs 500 \
+    --eons_seed 20 \
+    -N 6 \
+    --pname_suffix cont_modes_es20_n6_trial10 \
+    --world rss/turbopi-milling/world.yaml \
+    --behavior CIRCLINESS_INDEX \
+    --trial 10
